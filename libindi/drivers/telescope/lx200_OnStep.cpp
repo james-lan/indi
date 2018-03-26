@@ -31,7 +31,10 @@
 #define ONSTEP_TIMEOUT  3
 #define RB_MAX_LEN 64
 
-LX200_OnStep::LX200_OnStep() : LX200Generic()
+
+
+
+LX200_OnStep::LX200_OnStep() : LX200Generic(), FI(this)
 {
     currentCatalog    = LX200_STAR_C;
     currentSubCatalog = 0;
@@ -49,6 +52,10 @@ LX200_OnStep::LX200_OnStep() : LX200Generic()
     // Get generic capabilities but discard the followng:
     // LX200_HAS_FOCUS
 
+  //  INDI::FocuserInterface::FocuserInterface();
+    //FI::SetCapability(FOCUSER_HAS_VARIABLE_SPEED);
+    //Next line should be correct... when done.
+    FI::SetCapability(FOCUSER_CAN_ABS_MOVE | FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT | FOCUSER_HAS_VARIABLE_SPEED);
 }
 
 const char *LX200_OnStep::getDefaultName()
@@ -58,10 +65,26 @@ const char *LX200_OnStep::getDefaultName()
 
 bool LX200_OnStep::initProperties()
 {
+	FI::initProperties(FOCUS_TAB);
     LX200Generic::initProperties();
 
     SetParkDataType(PARK_RA_DEC);
-
+    
+    FocusSpeedN[0].min   = 0;
+    FocusSpeedN[0].max   = 5;
+    FocusSpeedN[0].step  = 1;
+    FocusSpeedN[0].value = 1;
+    FocusRelPosN[0].min   = 0.;
+    FocusRelPosN[0].max   = 30000.;
+    FocusRelPosN[0].value = 0;
+    FocusRelPosN[0].step  = 10;
+    FocusAbsPosN[0].min   = 0.;
+    FocusAbsPosN[0].max   = 60000.;
+    FocusAbsPosN[0].value = 0;
+    FocusAbsPosN[0].step  = 10;
+    
+    
+    
     // ============== MAIN_CONTROL_TAB
     IUFillSwitch(&ReticS[0], "PLUS", "Light", ISS_OFF);
     IUFillSwitch(&ReticS[1], "MOINS", "Dark", ISS_OFF);
@@ -127,6 +150,9 @@ bool LX200_OnStep::initProperties()
     IUFillNumber(&OSFocus1TargN[0], "FocusTarget1", "Abs Pos", "%g", -25000, 25000, 1, 0);
     IUFillNumberVector(&OSFocus1TargNP, OSFocus1TargN, 1, getDeviceName(), "Foc1Targ", "Foc 1 Target", FOCUS_TAB, IP_RW, 0,IPS_IDLE);
 
+    IUFillNumber(&OSFocus1TargRelN[0], "FocusTargetRel1", "Relative Movement", "%g", -5000, 5000, 1, 0);
+    IUFillNumberVector(&OSFocus1TargRelNP, OSFocus1TargRelN, 1, getDeviceName(), "Foc1RTarg", "Foc 1 Rel Target", FOCUS_TAB, IP_RW, 0,IPS_IDLE);
+    
     // Focuser 2
     //IUFillSwitch(&OSFocus2SelS[0], "Focus2_Sel1", "Foc 1", ISS_OFF);
     //IUFillSwitch(&OSFocus2SelS[1], "Focus2_Sel2", "Foc 2", ISS_OFF);
@@ -206,6 +232,7 @@ void LX200_OnStep::ISGetProperties(const char *dev)
 bool LX200_OnStep::updateProperties()
 {
     LX200Generic::updateProperties();
+    FI::updateProperties();
 
     if (isConnected())
     {
@@ -243,6 +270,7 @@ bool LX200_OnStep::updateProperties()
             defineSwitch(&OSFocus1MotionSP);
             defineSwitch(&OSFocus1RateSP);
             defineNumber(&OSFocus1TargNP);
+	    defineNumber(&OSFocus1TargRelNP);
 
         }
         // Focuser 2
@@ -320,6 +348,7 @@ bool LX200_OnStep::updateProperties()
         deleteProperty(OSFocus1MotionSP.name);
         deleteProperty(OSFocus1RateSP.name);
         deleteProperty(OSFocus1TargNP.name);
+	deleteProperty(OSFocus1TargRelNP.name);
         // Focuser 2
         //deleteProperty(OSFocus2SelSP.name);
         deleteProperty(OSFocus2MotionSP.name);
@@ -345,6 +374,8 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
 {
     if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
     {
+	if (strstr(name, "FOCUS_"))
+		    return FI::processNumber(dev, name, values, names, n);
         if (!strcmp(name, ObjectNoNP.name))
         {
             char object_name[256];
@@ -498,22 +529,43 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
     }
 
     // Focuser
-    // Focuser 1 Target
+    // Focuser 1 Target Absolute
     if (!strcmp(name, OSFocus1TargNP.name))
+    {
+	    char cmd[32];
+	    
+	    if ((values[0] >= -25000) && (values[0] <= 25000))
+	    {
+		    snprintf(cmd, 15, ":FR%d#", (int)values[0]);
+		    sendOnStepCommandBlind(cmd);
+		    OSFocus1TargNP.s           = IPS_OK;
+		    IDSetNumber(&OSFocus1TargNP, "Focuser 1 position (absolute) moved by %d", (int)values[0]);
+		    OSUpdateFocuser();
+	    }
+	    else
+	    {
+		    OSFocus1TargNP.s = IPS_ALERT;
+		    IDSetNumber(&OSFocus1TargNP, "Setting MFocuser 1 position (absolute) Failed");
+	    }
+	    return true;
+    }
+    // Focuser 1 Target Relative
+    if (!strcmp(name, OSFocus1TargRelNP.name))
     {
         char cmd[32];
 
-        if ((values[0] >= -25000) && (values[0] <= 25000))
+        if ((values[0] >= -5000) && (values[0] <= 5000))
         {
             snprintf(cmd, 15, ":FR%d#", (int)values[0]);
             sendOnStepCommandBlind(cmd);
-            OSFocus1TargNP.s           = IPS_OK;
-            IDSetNumber(&OSFocus1TargNP, "Slewrate set to %d", (int)values[0]);
+            OSFocus1TargRelNP.s           = IPS_OK;
+            IDSetNumber(&OSFocus1TargRelNP, "Focuser 1 position (relative) moved by %d", (int)values[0]);
+	    OSUpdateFocuser();
         }
         else
         {
-            OSFocus1TargNP.s = IPS_ALERT;
-            IDSetNumber(&OSFocus1TargNP, "Setting Max Slew Rate Failed");
+            OSFocus1TargRelNP.s = IPS_ALERT;
+	    IDSetNumber(&OSFocus1TargRelNP, "Setting Focuser 1 position (relative) Failed");
         }
         return true;
     }
@@ -527,7 +579,8 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
             snprintf(cmd, 15, ":fR%d#", (int)values[0]);
             sendOnStepCommandBlind(cmd);
             OSFocus2TargNP.s           = IPS_OK;
-            IDSetNumber(&OSFocus2TargNP, "Slewrate set to %d", (int)values[0]);
+	    IDSetNumber(&OSFocus2TargNP, "Focuser 2 position (relative) moved by %d", (int)values[0]);
+	    OSUpdateFocuser();
         }
         else
         {
@@ -857,6 +910,11 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
             Goto(targetRA, targetDEC);
              return true;
         }
+        if (strstr(name, "FOCUS"))
+	{
+		return FI::processSwitch(dev, name, states, names, n);
+	}
+	
     }
 
     return LX200Generic::ISNewSwitch(dev, name, states, names, n);
@@ -948,13 +1006,13 @@ bool LX200_OnStep::Park()      // Tested
         {
             if (!isSimulation() && abortSlew(PortFD) < 0)
             {
-                AbortSP.s = IPS_ALERT;
-                IDSetSwitch(&AbortSP, "Abort slew failed.");
+		    AbortSP.s = IPS_ALERT;
+		    IDSetSwitch(&AbortSP, "Abort slew failed.");
                 return false;
             }
             AbortSP.s = IPS_OK;
             EqNP.s    = IPS_IDLE;
-            IDSetSwitch(&AbortSP, "Slew aborted.");
+	    IDSetSwitch(&AbortSP, "Slew aborted.");
             IDSetNumber(&EqNP, nullptr);
 
             if (MovementNSSP.s == IPS_BUSY || MovementWESP.s == IPS_BUSY)
@@ -1373,7 +1431,10 @@ void LX200_OnStep::OSUpdateFocuser()
     {
         getCommandString(PortFD, value, ":FG#");
         OSFocus1TargNP.np[0].value = atoi(value);
+	FocusAbsPosN[0].value =  atoi(value);
         IDSetNumber(&OSFocus1TargNP, nullptr);
+	//IDSetNumber(&FocusAbsPosNP, nullptr);
+	IDSetNumber(&FocusAbsPosNP, nullptr);
     }
     if(OSFocuser2)
     {
@@ -1381,4 +1442,107 @@ void LX200_OnStep::OSUpdateFocuser()
         OSFocus2TargNP.np[0].value = atoi(value);
         IDSetNumber(&OSFocus2TargNP, nullptr);
     }
+}
+
+/***** FOCUSER INTERFACE ******
+
+virtual bool 	SetFocuserSpeed (int speed)
+SetFocuserSpeed Set Focuser speed. More...
+
+virtual IPState 	MoveFocuser (FocusDirection dir, int speed, uint16_t duration)
+MoveFocuser the focuser in a particular direction with a specific speed for a finite duration. More...
+
+virtual IPState 	MoveAbsFocuser (uint32_t targetTicks)
+MoveFocuser the focuser to an absolute position. More...
+
+virtual IPState 	MoveRelFocuser (FocusDirection dir, uint32_t ticks)
+MoveFocuser the focuser to an relative position. More...
+
+virtual bool 	AbortFocuser ()
+AbortFocuser all focus motion. More...
+
+*/
+bool LX200_OnStep::SetFocuserSpeed(int speed)
+{
+// Note: Uses 0-5 as speeds
+// 1-4 are passed to FN, 0 sets to minimum, and 5 to maximum.
+	//  :Fn#   Movement rate, 1=finest, 2=0.01mm/second, 3=0.1mm/second, 4=1mm/second
+	//         Returns: Nothing
+	//  :FS#      Set focuser for slow motion
+	//            Returns: Nothing
+	//  :FF#   Set focuser for fast motion
+	//         Returns: Nothing
+	char read_buffer[32];
+	if (speed > FocusSpeedN[0].min && speed < FocusSpeedN[0].max)
+	{
+		snprintf(read_buffer, sizeof(read_buffer), ":FR%1i#", speed);
+		return sendOnStepCommandBlind(read_buffer);
+	}
+	if (speed == FocusSpeedN[0].min)
+	{
+		snprintf(read_buffer, sizeof(read_buffer), ":FS#");
+		return sendOnStepCommandBlind(read_buffer);
+	}
+	if (speed == FocusSpeedN[0].max)
+	{
+		snprintf(read_buffer, sizeof(read_buffer), ":FF#");
+		return sendOnStepCommandBlind(read_buffer);
+	}
+	return false;
+}
+
+IPState LX200_OnStep::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
+{
+	//  :FRsnnn#  Set focuser target position relative (in microns)
+	//            Returns: Nothing
+	double output;
+	char read_buffer[32];
+	SetFocuserSpeed(speed);
+	output = speed * duration;
+	if (dir == FOCUS_INWARD) output = 0-output; 
+	snprintf(read_buffer, sizeof(read_buffer), ":FR%5f#", output);
+	
+	if(sendOnStepCommandBlind(read_buffer)){
+		return IPS_ALERT;
+	} else {
+		return IPS_BUSY; // Normal case, should be set to normal by update. 
+	}
+
+}
+
+IPState LX200_OnStep::MoveAbsFocuser (uint32_t targetTicks) {
+	//  :FSsnnn#  Set focuser target position (in microns)
+	//            Returns: Nothing
+//TODO: Bounds Checking using FI and FM! 
+	char read_buffer[32];
+	snprintf(read_buffer, sizeof(read_buffer), ":FS%06d#", targetTicks);
+	
+	if(sendOnStepCommandBlind(read_buffer)){
+		return IPS_ALERT;
+	} else {
+		return IPS_BUSY; // Normal case, should be set to normal by update. 
+	}
+}
+IPState LX200_OnStep::MoveRelFocuser (FocusDirection dir, uint32_t ticks) {
+	//  :FRsnnn#  Set focuser target position relative (in microns)
+	//            Returns: Nothing
+	int output;
+	char read_buffer[32];
+	output = ticks;
+	if (dir == FOCUS_INWARD) output = 0-ticks; 
+	snprintf(read_buffer, sizeof(read_buffer), ":FR%04d#", output);
+	
+	if(sendOnStepCommandBlind(read_buffer)){
+		return IPS_ALERT;
+	} else {
+		return IPS_BUSY; // Normal case, should be set to normal by update. 
+	}
+}
+
+bool LX200_OnStep::AbortFocuser () {   
+	//  :FQ#   Stop the focuser
+	//         Returns: Nothing
+	char cmd[8];
+	strcpy(cmd, ":FQ#");
+	return sendOnStepCommandBlind(cmd);
 }
