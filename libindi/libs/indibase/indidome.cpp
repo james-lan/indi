@@ -143,8 +143,8 @@ bool Dome::initProperties()
     IUFillNumberVector(&DomeRelPosNP, DomeRelPosN, 1, getDeviceName(), "REL_DOME_POSITION", "Relative Position",
                        MAIN_CONTROL_TAB, IP_RW, 60, IPS_OK);
 
-    IUFillSwitch(&AbortS[0], "ABORT", "Abort", ISS_OFF);
-    IUFillSwitchVector(&AbortSP, AbortS, 1, getDeviceName(), "DOME_ABORT_MOTION", "Abort Motion", MAIN_CONTROL_TAB,
+    IUFillSwitch(&DomeAbortS[0], "ABORT", "Abort", ISS_OFF);
+    IUFillSwitchVector(&DomeAbortSP, DomeAbortS, 1, getDeviceName(), "DOME_ABORT_MOTION", "Abort Motion", MAIN_CONTROL_TAB,
                        IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
     IUFillNumber(&DomeParamN[0], "AUTOSYNC_THRESHOLD", "Autosync threshold (deg)", "%6.2f", 0.0, 360.0, 1.0, 0.5);
@@ -235,7 +235,7 @@ bool Dome::updateProperties()
         if (CanAbsMove())
             defineNumber(&DomeAbsPosNP);
         if (CanAbort())
-            defineSwitch(&AbortSP);
+		defineSwitch(&DomeAbortSP);
         if (CanAbsMove())
         {
             defineNumber(&PresetNP);
@@ -276,7 +276,7 @@ bool Dome::updateProperties()
         if (CanAbsMove())
             deleteProperty(DomeAbsPosNP.name);
         if (CanAbort())
-            deleteProperty(AbortSP.name);
+		deleteProperty(DomeAbortSP.name);
         if (CanAbsMove())
         {
             deleteProperty(PresetNP.name);
@@ -471,7 +471,7 @@ bool Dome::ISNewSwitch(const char *dev, const char *name, ISState *states, char 
             return true;
         }
 
-        if (!strcmp(name, AbortSP.name))
+        if (!strcmp(name, DomeAbortSP.name))
         {
             Dome::Abort();
             return true;
@@ -1738,11 +1738,11 @@ bool Dome::Abort()
         return false;
     }
 
-    IUResetSwitch(&AbortSP);
+    IUResetSwitch(&DomeAbortSP);
 
     if (Abort())
     {
-        AbortSP.s = IPS_OK;
+	    DomeAbortSP.s = IPS_OK;
 
         if (domeState == DOME_PARKING || domeState == DOME_UNPARKING)
         {
@@ -1768,7 +1768,7 @@ bool Dome::Abort()
     }
     else
     {
-        AbortSP.s = IPS_ALERT;
+	    DomeAbortSP.s = IPS_ALERT;
 
         // If alert was aborted during parking or unparking, the parking state is unknown
         if (domeState == DOME_PARKING || domeState == DOME_UNPARKING)
@@ -1779,9 +1779,9 @@ bool Dome::Abort()
         }
     }
 
-    IDSetSwitch(&AbortSP, nullptr);
+    IDSetSwitch(&DomeAbortSP, nullptr);
 
-    return (AbortSP.s == IPS_OK);
+    return (DomeAbortSP.s == IPS_OK);
 }
 
 bool Dome::SetSpeed(double speed)

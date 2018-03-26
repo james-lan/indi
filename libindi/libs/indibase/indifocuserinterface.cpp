@@ -54,8 +54,8 @@ void FocuserInterface::initProperties(const char *groupName)
     IUFillNumberVector(&FocusRelPosNP, FocusRelPosN, 1, m_defaultDevice->getDeviceName(), "REL_FOCUS_POSITION", "Relative Position",
                        groupName, IP_RW, 60, IPS_OK);
 
-    IUFillSwitch(&AbortS[0], "ABORT", "Abort", ISS_OFF);
-    IUFillSwitchVector(&AbortSP, AbortS, 1, m_defaultDevice->getDeviceName(), "FOCUS_ABORT_MOTION", "Abort Motion", groupName, IP_RW,
+    IUFillSwitch(&FocusAbortS[0], "ABORT", "Abort", ISS_OFF);
+    IUFillSwitchVector(&FocusAbortSP, FocusAbortS, 1, m_defaultDevice->getDeviceName(), "FOCUS_ABORT_MOTION", "Abort Motion", groupName, IP_RW,
                        ISR_ATMOST1, 60, IPS_IDLE);
 }
 
@@ -76,7 +76,7 @@ bool FocuserInterface::updateProperties()
         if (CanAbsMove())
             m_defaultDevice->defineNumber(&FocusAbsPosNP);
         if (CanAbort())
-            m_defaultDevice->defineSwitch(&AbortSP);
+            m_defaultDevice->defineSwitch(&FocusAbortSP);
     }
     else
     {
@@ -91,7 +91,7 @@ bool FocuserInterface::updateProperties()
         if (CanAbsMove())
             m_defaultDevice->deleteProperty(FocusAbsPosNP.name);
         if (CanAbort())
-            m_defaultDevice->deleteProperty(AbortSP.name);
+            m_defaultDevice->deleteProperty(FocusAbortSP.name);
     }
 
     return true;
@@ -291,11 +291,11 @@ bool FocuserInterface::processSwitch(const char *dev, const char *name, ISState 
 
     if (strcmp(name, "FOCUS_ABORT_MOTION") == 0)
     {
-        IUResetSwitch(&AbortSP);
+        IUResetSwitch(&FocusAbortSP);
 
         if (AbortFocuser())
         {
-            AbortSP.s = IPS_OK;
+            FocusAbortSP.s = IPS_OK;
             if (CanAbsMove() && FocusAbsPosNP.s != IPS_IDLE)
             {
                 FocusAbsPosNP.s = IPS_IDLE;
@@ -308,9 +308,9 @@ bool FocuserInterface::processSwitch(const char *dev, const char *name, ISState 
             }
         }
         else
-            AbortSP.s = IPS_ALERT;
+            FocusAbortSP.s = IPS_ALERT;
 
-        IDSetSwitch(&AbortSP, nullptr);
+        IDSetSwitch(&FocusAbortSP, nullptr);
         return true;
     }
 
