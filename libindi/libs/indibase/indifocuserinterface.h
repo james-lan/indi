@@ -177,8 +177,8 @@ class FocuserInterface
     INumber FocusAbsPosN[1];
     INumberVectorProperty FocusRelPosNP;
     INumber FocusRelPosN[1];
-    ISwitchVectorProperty AbortSP;
-    ISwitch AbortS[1];
+    ISwitchVectorProperty FocusAbortSP;
+    ISwitch FocusAbortS[1];
 
     uint32_t capability;
 

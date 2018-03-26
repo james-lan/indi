@@ -457,8 +457,8 @@ class Dome : public DefaultDevice
     INumberVectorProperty DomeRelPosNP;
     INumber DomeRelPosN[1];
 
-    ISwitchVectorProperty AbortSP;
-    ISwitch AbortS[1];
+    ISwitchVectorProperty DomeAbortSP;
+    ISwitch DomeAbortS[1];
 
     INumberVectorProperty DomeParamNP;
     INumber DomeParamN[1];
