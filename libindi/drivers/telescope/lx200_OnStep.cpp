@@ -65,9 +65,9 @@ const char *LX200_OnStep::getDefaultName()
 
 bool LX200_OnStep::initProperties()
 {
-	FI::initProperties(FOCUS_TAB);
-    LX200Generic::initProperties();
 
+    LX200Generic::initProperties();
+    FI::initProperties(FOCUS_TAB);
     SetParkDataType(PARK_RA_DEC);
     
     FocusSpeedN[0].min   = 0;
@@ -1569,11 +1569,13 @@ void LX200_OnStep::OSUpdateFocuser()
 
 	getCommandString(PortFD, value, ":FM#");
 	FocusAbsPosN[0].max   = atoi(value);
+	IUUpdateMinMax(&FocusAbsPosNP);
 	IDSetNumber(&FocusAbsPosNP, nullptr);
 	//  :FI#  Get full in position (in microns)
 	//         Returns: n#
 	getCommandString(PortFD, value, ":FI#");
 	FocusAbsPosN[0].min =  atoi(value);
+	IUUpdateMinMax(&FocusAbsPosNP);
 	IDSetNumber(&FocusAbsPosNP, nullptr);
 /*	if(OSFocuser1)
 	{
