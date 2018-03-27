@@ -55,7 +55,8 @@ LX200_OnStep::LX200_OnStep() : LX200Generic(), FI(this)
   //  INDI::FocuserInterface::FocuserInterface();
     //FI::SetCapability(FOCUSER_HAS_VARIABLE_SPEED);
     //Next line should be correct... when done.
-    FI::SetCapability(FOCUSER_CAN_ABS_MOVE | FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT | FOCUSER_HAS_VARIABLE_SPEED);
+    FI::SetCapability(FOCUSER_CAN_ABS_MOVE | FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT );
+    //Removed as unneeded: | FOCUSER_HAS_VARIABLE_SPEED
 }
 
 const char *LX200_OnStep::getDefaultName()
@@ -70,8 +71,8 @@ bool LX200_OnStep::initProperties()
     FI::initProperties(FOCUS_TAB);
     SetParkDataType(PARK_RA_DEC);
     
-    FocusSpeedN[0].min   = 0;
-    FocusSpeedN[0].max   = 5;
+    FocusSpeedN[0].min   = 1;
+    FocusSpeedN[0].max   = 4;
     FocusSpeedN[0].step  = 1;
     FocusSpeedN[0].value = 1;
     FocusRelPosN[0].min   = 0.;
@@ -1462,7 +1463,7 @@ virtual bool 	AbortFocuser ()
 AbortFocuser all focus motion. More...
 
 */
-bool LX200_OnStep::SetFocuserSpeed(int speed)
+/*bool LX200_OnStep::SetFocuserSpeed(int speed)
 {
 // Note: Uses 0-5 as speeds
 // 1-4 are passed to FN, 0 sets to minimum, and 5 to maximum.
@@ -1473,12 +1474,12 @@ bool LX200_OnStep::SetFocuserSpeed(int speed)
 	//  :FF#   Set focuser for fast motion
 	//         Returns: Nothing
 	char read_buffer[32];
-	if (speed > FocusSpeedN[0].min && speed < FocusSpeedN[0].max)
+	if (speed >= FocusSpeedN[0].min && speed <= FocusSpeedN[0].max)
 	{
 		snprintf(read_buffer, sizeof(read_buffer), ":FR%1i#", speed);
 		return sendOnStepCommandBlind(read_buffer);
 	}
-	if (speed == FocusSpeedN[0].min)
+/*	if (speed == FocusSpeedN[0].min)
 	{
 		snprintf(read_buffer, sizeof(read_buffer), ":FS#");
 		return sendOnStepCommandBlind(read_buffer);
@@ -1488,8 +1489,9 @@ bool LX200_OnStep::SetFocuserSpeed(int speed)
 		snprintf(read_buffer, sizeof(read_buffer), ":FF#");
 		return sendOnStepCommandBlind(read_buffer);
 	}
+//*
 	return false;
-}
+}*/
 
 IPState LX200_OnStep::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
 {
@@ -1497,8 +1499,8 @@ IPState LX200_OnStep::MoveFocuser(FocusDirection dir, int speed, uint16_t durati
 	//            Returns: Nothing
 	double output;
 	char read_buffer[32];
-	SetFocuserSpeed(speed);
-	output = speed * duration;
+//	SetFocuserSpeed(speed);
+	output =  duration;
 	if (dir == FOCUS_INWARD) output = 0-output; 
 	snprintf(read_buffer, sizeof(read_buffer), ":FR%5f#", output);
 	
@@ -1577,6 +1579,7 @@ void LX200_OnStep::OSUpdateFocuser()
 	FocusAbsPosN[0].min =  atoi(value);
 	IUUpdateMinMax(&FocusAbsPosNP);
 	IDSetNumber(&FocusAbsPosNP, nullptr);
+	FI::updateProperties();
 /*	if(OSFocuser1)
 	{
 		getCommandString(PortFD, value, ":FG#");
