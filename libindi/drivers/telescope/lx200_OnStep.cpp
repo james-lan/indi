@@ -1424,7 +1424,7 @@ bool LX200_OnStep::kdedialog(const char * commande)
     return system(commande);
 }
 
-void LX200_OnStep::OSUpdateFocuser()
+/*void LX200_OnStep::OSUpdateFocuser()
 {
     char value[10];
     if(OSFocuser1)
@@ -1442,7 +1442,7 @@ void LX200_OnStep::OSUpdateFocuser()
         OSFocus2TargNP.np[0].value = atoi(value);
         IDSetNumber(&OSFocus2TargNP, nullptr);
     }
-}
+}*/
 
 /***** FOCUSER INTERFACE ******
 
@@ -1502,11 +1502,8 @@ IPState LX200_OnStep::MoveFocuser(FocusDirection dir, int speed, uint16_t durati
 	if (dir == FOCUS_INWARD) output = 0-output; 
 	snprintf(read_buffer, sizeof(read_buffer), ":FR%5f#", output);
 	
-	if(sendOnStepCommandBlind(read_buffer)){
-		return IPS_ALERT;
-	} else {
-		return IPS_BUSY; // Normal case, should be set to normal by update. 
-	}
+	sendOnStepCommandBlind(read_buffer);
+	return IPS_BUSY; // Normal case, should be set to normal by update. 
 
 }
 
@@ -1517,11 +1514,8 @@ IPState LX200_OnStep::MoveAbsFocuser (uint32_t targetTicks) {
 	char read_buffer[32];
 	snprintf(read_buffer, sizeof(read_buffer), ":FS%06d#", targetTicks);
 	
-	if(sendOnStepCommandBlind(read_buffer)){
-		return IPS_ALERT;
-	} else {
-		return IPS_BUSY; // Normal case, should be set to normal by update. 
-	}
+	sendOnStepCommandBlind(read_buffer);
+	return IPS_BUSY; // Normal case, should be set to normal by update. 
 }
 IPState LX200_OnStep::MoveRelFocuser (FocusDirection dir, uint32_t ticks) {
 	//  :FRsnnn#  Set focuser target position relative (in microns)
@@ -1532,11 +1526,8 @@ IPState LX200_OnStep::MoveRelFocuser (FocusDirection dir, uint32_t ticks) {
 	if (dir == FOCUS_INWARD) output = 0-ticks; 
 	snprintf(read_buffer, sizeof(read_buffer), ":FR%04d#", output);
 	
-	if(sendOnStepCommandBlind(read_buffer)){
-		return IPS_ALERT;
-	} else {
-		return IPS_BUSY; // Normal case, should be set to normal by update. 
-	}
+	sendOnStepCommandBlind(read_buffer);
+	return IPS_BUSY; // Normal case, should be set to normal by update. 
 }
 
 bool LX200_OnStep::AbortFocuser () {   
@@ -1545,4 +1536,58 @@ bool LX200_OnStep::AbortFocuser () {
 	char cmd[8];
 	strcpy(cmd, ":FQ#");
 	return sendOnStepCommandBlind(cmd);
+}
+
+void LX200_OnStep::OSUpdateFocuser()
+{
+	char value[10];
+	getCommandString(PortFD, value, ":FG#");
+	FocusAbsPosN[0].value =  atoi(value);
+	IDSetNumber(&FocusAbsPosNP, nullptr);
+	//  :FT#  get status
+	//         Returns: M# (for moving) or S# (for stopped)
+	getCommandString(PortFD, value, ":FT#");
+	if (value[0] == 'S') {
+		FocusRelPosNP.s = IPS_OK;
+		IDSetNumber(&FocusRelPosNP, nullptr);
+		FocusAbsPosNP.s = IPS_OK;
+		IDSetNumber(&FocusAbsPosNP, nullptr);
+	} else if (value[0] == 'M') {
+		FocusRelPosNP.s = IPS_BUSY;
+		IDSetNumber(&FocusRelPosNP, nullptr);
+		FocusAbsPosNP.s = IPS_BUSY;
+		IDSetNumber(&FocusAbsPosNP, nullptr);
+	} else { //INVALID REPLY
+		FocusRelPosNP.s = IPS_ALERT;
+		IDSetNumber(&FocusRelPosNP, nullptr);
+		FocusAbsPosNP.s = IPS_ALERT;
+		IDSetNumber(&FocusAbsPosNP, nullptr);
+	}
+	
+	//  :FM#  Get max position (in microns)
+	//         Returns: n#
+
+	getCommandString(PortFD, value, ":FM#");
+	FocusAbsPosN[0].max   = atoi(value);
+	IDSetNumber(&FocusAbsPosNP, nullptr);
+	//  :FI#  Get full in position (in microns)
+	//         Returns: n#
+	getCommandString(PortFD, value, ":FI#");
+	FocusAbsPosN[0].min =  atoi(value);
+	IDSetNumber(&FocusAbsPosNP, nullptr);
+/*	if(OSFocuser1)
+	{
+		getCommandString(PortFD, value, ":FG#");
+		OSFocus1TargNP.np[0].value = atoi(value);
+		FocusAbsPosN[0].value =  atoi(value);
+		IDSetNumber(&OSFocus1TargNP, nullptr);
+		//IDSetNumber(&FocusAbsPosNP, nullptr);
+		IDSetNumber(&FocusAbsPosNP, nullptr);
+	}
+	if(OSFocuser2)
+	{
+		getCommandString(PortFD, value, ":fG#");
+		OSFocus2TargNP.np[0].value = atoi(value);
+		IDSetNumber(&OSFocus2TargNP, nullptr);
+	}*/
 }
