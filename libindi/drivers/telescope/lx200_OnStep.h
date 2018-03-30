@@ -77,7 +77,7 @@ class LX200_OnStep : public LX200Generic, public INDI::FocuserInterface
     
     //FocuserInterface
     
-    bool SetFocuserSpeed(int speed) override;
+//    bool SetFocuserSpeed(int speed) override;
     IPState MoveFocuser(FocusDirection dir, int speed, uint16_t duration) override;
     IPState MoveAbsFocuser (uint32_t targetTicks) override;
     IPState MoveRelFocuser (FocusDirection dir, uint32_t ticks) override;
