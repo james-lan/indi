@@ -235,8 +235,14 @@ bool V4L2_Driver::updateProperties()
         defineSwitch(&ColorProcessingSP);
         defineText(&CaptureColorSpaceTP);
 #endif
-
-        SetCCDParams(V4LFrame->width, V4LFrame->height, V4LFrame->bpp, 5.6, 5.6);
+	LOGF_INFO("device_name: '%s'", v4l_base->getDeviceName());
+	if (!strcmp(v4l_base->getDeviceName(), "NexImage 5")) {
+		SetCCDParams(V4LFrame->width, V4LFrame->height, V4LFrame->bpp, 2.2, 2.2);
+		LOG_INFO("Setting pixel size correctly");
+	} else {
+		SetCCDParams(V4LFrame->width, V4LFrame->height, V4LFrame->bpp, 5.6, 5.6);
+		LOG_INFO("Setting pixel size to default of 5.6");
+	}
         PrimaryCCD.setImageExtension("fits");
 
         //v4l_base->setRecorder(Streamer->getRecorder());
