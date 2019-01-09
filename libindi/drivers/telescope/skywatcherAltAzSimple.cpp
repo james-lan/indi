@@ -49,7 +49,7 @@ bool FileExists(const std::string &name)
 
 std::string GetLogTimestamp()
 {
-    time_t Now = time(NULL);
+    time_t Now = time(nullptr);
     struct tm TimeStruct;
     char Buffer[60];
     std::string FinalStr;
@@ -1058,7 +1058,7 @@ void SkywatcherAltAzSimple::TimerHit()
         case SCOPE_SLEWING:
             if (!Slewing)
             {
-                DEBUG(INDI::Logger::DBG_SESSION, "Slewing started");
+                LOG_INFO("Slewing started");
                 TrackingStartTimer = 0;
             }
             TrackingMsecs   = 0;
@@ -1094,7 +1094,7 @@ void SkywatcherAltAzSimple::TimerHit()
         {
             if (!Tracking)
             {
-                DEBUG(INDI::Logger::DBG_SESSION, "Tracking started");
+                LOG_INFO("Tracking started");
                 TrackingMsecs   = 0;
                 TimeoutDuration = (int)IUFindNumber(&TrackingValuesNP, "TRACKING_TIMEOUT")->value;
                 GuideDeltaAlt   = 0;
@@ -1227,11 +1227,11 @@ void SkywatcherAltAzSimple::TimerHit()
         default:
             if (Slewing)
             {
-                DEBUG(INDI::Logger::DBG_SESSION, "Slewing stopped");
+                LOG_INFO("Slewing stopped");
             }
             if (Tracking)
             {
-                DEBUG(INDI::Logger::DBG_SESSION, "Tracking stopped");
+                LOG_INFO("Tracking stopped");
             }
             TrackingMsecs   = 0;
             GuideDeltaAlt   = 0;
@@ -1305,7 +1305,7 @@ bool SkywatcherAltAzSimple::updateProperties()
     }
 }
 
-IPState SkywatcherAltAzSimple::GuideNorth(float ms)
+IPState SkywatcherAltAzSimple::GuideNorth(uint32_t ms)
 {
     GuidingPulse Pulse;
 
@@ -1316,7 +1316,7 @@ IPState SkywatcherAltAzSimple::GuideNorth(float ms)
     return IPS_OK;
 }
 
-IPState SkywatcherAltAzSimple::GuideSouth(float ms)
+IPState SkywatcherAltAzSimple::GuideSouth(uint32_t ms)
 {
     GuidingPulse Pulse;
 
@@ -1327,7 +1327,7 @@ IPState SkywatcherAltAzSimple::GuideSouth(float ms)
     return IPS_OK;
 }
 
-IPState SkywatcherAltAzSimple::GuideWest(float ms)
+IPState SkywatcherAltAzSimple::GuideWest(uint32_t ms)
 {
     GuidingPulse Pulse;
 
@@ -1338,7 +1338,7 @@ IPState SkywatcherAltAzSimple::GuideWest(float ms)
     return IPS_OK;
 }
 
-IPState SkywatcherAltAzSimple::GuideEast(float ms)
+IPState SkywatcherAltAzSimple::GuideEast(uint32_t ms)
 {
     GuidingPulse Pulse;
 

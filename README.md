@@ -36,7 +36,7 @@ Learn more about INDI:
 On Debian/Ubuntu:
 
 ```
-sudo apt-get install libnova-dev libcfitsio-dev libusb-1.0-0-dev zlib1g-dev libgsl-dev build-essential cmake git libjpeg-dev libcurl4-gnutls-dev
+sudo apt-get install libnova-dev libcfitsio-dev libusb-1.0-0-dev zlib1g-dev libgsl-dev build-essential cmake git libjpeg-dev libcurl4-gnutls-dev libtiff-dev
 ```
 ## Get the code
 ```
@@ -69,7 +69,7 @@ sudo make install
 The complete list of system dependancies for all drivers on Debian / Ubuntu
 
 ```
-sudo apt-get install libftdi-dev libgps-dev libraw-dev libgphoto2-dev libboost-dev libboost-regex-dev librtlsdr-dev libftdi1-dev libfftw3-dev
+sudo apt-get install libftdi-dev libgps-dev libraw-dev libdc1394-22-dev libgphoto2-dev libboost-dev libboost-regex-dev librtlsdr-dev liblimesuite-dev libftdi1-dev libfftw3-dev
 ```
 
 To build **all** 3rd party drivers, you need to run cmake and make install **twice**. First time is to install any dependencies of the 3rd party drivers (for example indi-qsi depends on libqsi), and second time to install the actual drivers themselves.
@@ -128,7 +128,9 @@ INDI server only provides convenient port, fork and data steering services. If d
 
 ### How to create Github pull request (PR)
 
-How I submit a PR:
+[How to contribute to INDI full guide](http://indilib.org/develop/tutorials/181-how-to-contribute-to-indi-github-development.html)
+
+Here is the short version on how to submit a PR:
 1. Login with a Github account and fork the official INDI repository.
 2. Clone the official INDI repository and add the forked INDI repository as a remote (git remote add ...).
 3. Create a local Git branch (git checkout -b my_branch).

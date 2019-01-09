@@ -28,7 +28,6 @@ class LX200AstroPhysicsExperimental : public LX200Generic
 {
   public:
     LX200AstroPhysicsExperimental();
-    ~LX200AstroPhysicsExperimental() {}
 
     typedef enum { MCV_E, MCV_F, MCV_G, MCV_H, MCV_I, MCV_J, MCV_K_UNUSED,
                    MCV_L, MCV_M, MCV_N, MCV_O, MCV_P, MCV_Q, MCV_R, MCV_S,
@@ -39,7 +38,7 @@ class LX200AstroPhysicsExperimental : public LX200Generic
 
     virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
     virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
-    virtual void ISGetProperties(const char *dev) override;
+    virtual void ISGetProperties(const char *dev) override;    
 
   protected:
 
@@ -50,6 +49,7 @@ class LX200AstroPhysicsExperimental : public LX200Generic
     virtual bool ReadScopeStatus() override;
     virtual bool Handshake() override;
     virtual bool Disconnect() override;
+    virtual bool Connect() override;
 
     // Parking
     virtual bool SetCurrentPark() override;
@@ -63,7 +63,14 @@ class LX200AstroPhysicsExperimental : public LX200Generic
     virtual bool updateLocation(double latitude, double longitude, double elevation) override;
     virtual bool SetSlewRate(int index) override;
 
-    virtual int  SendPulseCmd(int direction, int duration_msec) override;
+    // Guide Commands
+    virtual IPState GuideNorth(uint32_t ms) override;
+    virtual IPState GuideSouth(uint32_t ms) override;
+    virtual IPState GuideEast(uint32_t ms) override;
+    virtual IPState GuideWest(uint32_t ms) override;
+    virtual int  SendPulseCmd(int8_t direction, uint32_t duration_msec) override;
+    virtual bool GuideNS(INDI_DIR_NS dir, TelescopeMotionCommand command);
+    virtual bool GuideWE(INDI_DIR_WE dir, TelescopeMotionCommand command);
 
     virtual bool getUTFOffset(double *offset) override;
 
@@ -133,7 +140,12 @@ class LX200AstroPhysicsExperimental : public LX200Generic
     double lastRA=0, lastDE=0;
     double lastAZ=0, lastAL=0;
 
+    //int GuideNSTID;
+    //int GuideWETID;
+
     bool motionCommanded=false;
     bool mountInitialized=false;
     bool mountParked=false;
+
+    int rememberSlewRate = { -1 };
 };

@@ -88,8 +88,7 @@ FLICCD::FLICCD()
 
 FLICCD::~FLICCD()
 {
-    if (CameraModeS)
-        delete [] CameraModeS;
+    delete [] CameraModeS;
 }
 
 const char *FLICCD::getDefaultName()
@@ -216,7 +215,7 @@ bool FLICCD::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
                 return false;
 
             PortSP.s = IPS_OK;
-            IDSetSwitch(&PortSP, NULL);
+            IDSetSwitch(&PortSP, nullptr);
             return true;
         }
 
@@ -240,7 +239,7 @@ bool FLICCD::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
         }
 
         // Camera Modes
-        if (!strcmp(name, CameraModeSP.name))
+        if (!strcmp(name, CameraModeSP.name) && CameraModeS != nullptr)
         {
             int currentIndex = IUFindOnSwitchIndex(&CameraModeSP);
             LIBFLIAPI errCode = 0;
@@ -377,7 +376,7 @@ bool FLICCD::setupParams()
         LOGF_DEBUG("FLIGetFWRevision() succeed -> %s", fw_rev);
     }
 
-    IDSetText(&CamInfoTP, NULL);
+    IDSetText(&CamInfoTP, nullptr);
     ///////////////////////////
     // 4. Get Pixel size
     ///////////////////////////
@@ -457,7 +456,7 @@ bool FLICCD::setupParams()
         TemperatureN[0].min   = MIN_CCD_TEMP;
         TemperatureN[0].max   = MAX_CCD_TEMP;
         IUUpdateMinMax(&TemperatureNP);
-        IDSetNumber(&TemperatureNP, NULL);
+        IDSetNumber(&TemperatureNP, nullptr);
         LOGF_DEBUG("FLIGetTemperature() succeed -> %f", FLICam.temperature);
     }
 
@@ -562,7 +561,7 @@ bool FLICCD::StartExposure(float duration)
     PrimaryCCD.setExposureDuration(duration);
     ExposureRequest = duration;
 
-    gettimeofday(&ExpStart, NULL);
+    gettimeofday(&ExpStart, nullptr);
     LOGF_DEBUG("Taking a %g seconds frame...", ExposureRequest);
 
     InExposure = true;
@@ -781,14 +780,14 @@ void FLICCD::TimerHit()
                 if ((err = FLIGetTemperature(fli_dev, &ccdTemp)))
                 {
                     TemperatureNP.s = IPS_IDLE;
-                    IDSetNumber(&TemperatureNP, NULL);
+                    IDSetNumber(&TemperatureNP, nullptr);
                     LOGF_ERROR("FLIGetTemperature() failed. %s.", strerror((int)-err));
                     break;
                 }
                 if ((err = FLIGetCoolerPower(fli_dev, &ccdPower)))
                 {
                     CoolerNP.s = IPS_IDLE;
-                    IDSetNumber(&TemperatureNP, NULL);
+                    IDSetNumber(&TemperatureNP, nullptr);
                     IDSetNumber(&TemperatureNP, "FLIGetCoolerPower() failed. %s.", strerror((int)-err));
                     break;
                 }
@@ -797,14 +796,14 @@ void FLICCD::TimerHit()
             if (fabs(TemperatureN[0].value - ccdTemp) >= TEMP_THRESHOLD)
             {
                 TemperatureN[0].value = ccdTemp;
-                IDSetNumber(&TemperatureNP, NULL);
+                IDSetNumber(&TemperatureNP, nullptr);
             }
 
             if (fabs(CoolerN[0].value - ccdPower) >= TEMP_THRESHOLD)
             {
                 CoolerN[0].value = ccdPower;
                 CoolerNP.s       = TemperatureNP.s;
-                IDSetNumber(&CoolerNP, NULL);
+                IDSetNumber(&CoolerNP, nullptr);
             }
             break;
 
@@ -819,7 +818,7 @@ void FLICCD::TimerHit()
                 if ((err = FLIGetTemperature(fli_dev, &ccdTemp)))
                 {
                     TemperatureNP.s = IPS_IDLE;
-                    IDSetNumber(&TemperatureNP, NULL);
+                    IDSetNumber(&TemperatureNP, nullptr);
                     LOGF_ERROR("FLIGetTemperature() failed. %s.", strerror((int)-err));
                     break;
                 }
@@ -835,18 +834,18 @@ void FLICCD::TimerHit()
             if (fabs(FLICam.temperature - ccdTemp) <= TEMP_THRESHOLD)
             {
                 TemperatureNP.s = IPS_OK;
-                IDSetNumber(&TemperatureNP, NULL);
+                IDSetNumber(&TemperatureNP, nullptr);
             }
 
             if (fabs(CoolerN[0].value - ccdPower) >= TEMP_THRESHOLD)
             {
                 CoolerN[0].value = ccdPower;
                 CoolerNP.s       = TemperatureNP.s;
-                IDSetNumber(&CoolerNP, NULL);
+                IDSetNumber(&CoolerNP, nullptr);
             }
 
             TemperatureN[0].value = ccdTemp;
-            IDSetNumber(&TemperatureNP, NULL);
+            IDSetNumber(&TemperatureNP, nullptr);
             break;
 
         case IPS_ALERT:
@@ -871,11 +870,11 @@ bool FLICCD::findFLICCD(flidomain_t domain)
         return false;
     }
 
-    if (names != NULL && names[0] != NULL)
+    if (names != nullptr && names[0] != nullptr)
     {
         LOGF_DEBUG("Devices list: %s", names);
 
-        for (int i = 0; names[i] != NULL; i++)
+        for (int i = 0; names[i] != nullptr; i++)
         {
             for (int j = 0; names[i][j] != '\0'; j++)
                 if (names[i][j] == ';')
@@ -944,13 +943,16 @@ bool FLICCD::saveConfigItems(FILE *fp)
     IUSaveConfigNumber(fp, &FlushNP);
     IUSaveConfigSwitch(fp, &BackgroundFlushSP);
 
+    if (CameraModeS)
+        IUSaveConfigSwitch(fp, &CameraModeSP);
+
     return true;
 }
 
 void FLICCD::debugTriggered(bool enable)
 {
     if (enable)
-        FLISetDebugLevel(NULL, FLIDEBUG_INFO);
+        FLISetDebugLevel(nullptr, FLIDEBUG_INFO);
     else
-        FLISetDebugLevel(NULL, FLIDEBUG_WARN);
+        FLISetDebugLevel(nullptr, FLIDEBUG_WARN);
 }

@@ -34,7 +34,7 @@
 #define FOCUS_SETTINGS_TAB "Settings"
 #define TEMPERATURE_THRESHOLD 0.1
 
-std::unique_ptr<DMFC> dmfc(new DMFC());
+static std::unique_ptr<DMFC> dmfc(new DMFC());
 
 void ISGetProperties(const char *dev)
 {
@@ -198,7 +198,7 @@ bool DMFC::Handshake()
         return true;
     }
 
-    DEBUG(INDI::Logger::DBG_SESSION,
+    LOG_INFO(
           "Error retreiving data from DMFC, please ensure DMFC controller is powered and the port is correct.");
     return false;
 }
@@ -239,14 +239,14 @@ bool DMFC::ack()
     // Get rid of 0xA
     res[nbytes_read-1] = 0;
 
-    // Check for '\r' at end of string and replace with NULL (DMFC firmware version 2.8)
+    // Check for '\r' at end of string and replace with nullptr (DMFC firmware version 2.8)
     if( res[nbytes_read-2] == '\r') res[nbytes_read-2] = 0;
 
     LOGF_DEBUG("RES <%s>", res);
 
     tcflush(PortFD, TCIOFLUSH);
 
-    return (!strcmp(res, "OK_DMFCN"));
+    return (strstr(res, "OK_") != nullptr);
 }
 
 bool DMFC::sync(uint32_t newPosition)
@@ -441,7 +441,7 @@ bool DMFC::updateFocusParams()
 
     res[nbytes_read-1] = 0;
 
-    // Check for '\r' at end of string and replace with NULL (DMFC firmware version 2.8)
+    // Check for '\r' at end of string and replace with nullptr (DMFC firmware version 2.8)
     if( res[nbytes_read-2] == '\r') res[nbytes_read-2] = 0;
 
     LOGF_DEBUG("RES <%s>", res);
@@ -451,14 +451,14 @@ bool DMFC::updateFocusParams()
     char *token = std::strtok(res, ":");
 
     // #1 Status
-    if (token == nullptr || strcmp(token, "OK_DMFCN"))
+    if (token == nullptr || strstr(token, "OK_") == nullptr)
     {
         LOG_ERROR("Invalid status response.");
         return false;
     }
 
     // #2 Version
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -474,7 +474,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #3 Motor Type
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -492,7 +492,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #4 Temperature
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -517,7 +517,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #5 Position
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -533,7 +533,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #6 Moving Status
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -544,7 +544,7 @@ bool DMFC::updateFocusParams()
     isMoving = (token[0] == '1');
 
     // #7 LED Status
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -562,7 +562,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #8 Reverse Status
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -580,7 +580,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #9 Encoder status
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -598,7 +598,7 @@ bool DMFC::updateFocusParams()
     }
 
     // #10 Backlash
-    token = std::strtok(NULL, ":");
+    token = std::strtok(nullptr, ":");
 
     if (token == nullptr)
     {
@@ -621,7 +621,7 @@ bool DMFC::updateFocusParams()
         {
             BacklashN[0].value = backlash;
             BacklashNP.s = IPS_OK;
-            IDSetNumber(&BacklashNP, NULL);
+            IDSetNumber(&BacklashNP, nullptr);
         }
 
         if (BacklashCompensationS[BACKLASH_DISABLED].s == ISS_ON)

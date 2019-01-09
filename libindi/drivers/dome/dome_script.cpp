@@ -44,7 +44,7 @@ typedef enum
     SCRIPT_COUNT
 } scripts;
 
-std::unique_ptr<DomeScript> scope_script(new DomeScript());
+static std::unique_ptr<DomeScript> scope_script(new DomeScript());
 
 void ISGetProperties(const char *dev)
 {
@@ -189,7 +189,7 @@ bool DomeScript::RunScript(int script, ...)
         strcat(dbg, args[i]);
         strcat(dbg, "'");
       }
-      strcat(dbg, ", NULL)");
+      strcat(dbg, ", nullptr)");
       LOG_DEBUG(dbg);
     }
 
@@ -237,7 +237,9 @@ void DomeScript::TimerHit()
 {
     if (!isConnected())
         return;
-    char name[1024];
+    char name[1024]={0};
+    // N.B. INDI_UNUSED to make it compile on MacOS
+    // DO NOT CHANGE
     char *s = tmpnam(name);
     INDI_UNUSED(s);
     bool status = RunScript(SCRIPT_STATUS, name, nullptr);

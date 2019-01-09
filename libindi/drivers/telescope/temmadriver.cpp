@@ -39,9 +39,7 @@ using namespace INDI::AlignmentSubsystem;
 #endif
 
 // We declare an auto pointer to temma.
-std::unique_ptr<TemmaMount> temma(new TemmaMount());
-
-void ISPoll(void *p);
+static std::unique_ptr<TemmaMount> temma(new TemmaMount());
 
 void ISGetProperties(const char *dev)
 {
@@ -92,7 +90,7 @@ TemmaMount::TemmaMount()
     Longitude = std::numeric_limits<double>::quiet_NaN();
     Latitude  = std::numeric_limits<double>::quiet_NaN();
 
-    setVersion(0, 2);
+    setVersion(0, 3);
 }
 
 const char *TemmaMount::getDefaultName()
@@ -116,6 +114,8 @@ bool TemmaMount::initProperties()
     serialConnection->setParity(1);
 
     addSimulationControl();
+
+    setDriverInterface(getDriverInterface() | GUIDER_INTERFACE);
 
     // TODO enable later
 #if 0
@@ -803,7 +803,7 @@ bool TemmaMount::SetSlewRate(int index)
 #endif
 
 // TODO For large ms > 1000ms this function should be asynchronous
-IPState TemmaMount::GuideNorth(float ms)
+IPState TemmaMount::GuideNorth(uint32_t ms)
 {
     char cmd[TEMMA_BUFFER] = {0};
     char bits;
@@ -828,7 +828,7 @@ IPState TemmaMount::GuideNorth(float ms)
     return IPS_OK;
 }
 
-IPState TemmaMount::GuideSouth(float ms)
+IPState TemmaMount::GuideSouth(uint32_t ms)
 {
     char cmd[TEMMA_BUFFER] = {0};
     char bits;
@@ -854,7 +854,7 @@ IPState TemmaMount::GuideSouth(float ms)
     return IPS_OK;
 }
 
-IPState TemmaMount::GuideEast(float ms)
+IPState TemmaMount::GuideEast(uint32_t ms)
 {
     char cmd[TEMMA_BUFFER] = {0};
     char bits;
@@ -877,7 +877,7 @@ IPState TemmaMount::GuideEast(float ms)
     return IPS_OK;
 }
 
-IPState TemmaMount::GuideWest(float ms)
+IPState TemmaMount::GuideWest(uint32_t ms)
 {
     char cmd[TEMMA_BUFFER] = {0};
     char bits;

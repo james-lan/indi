@@ -29,11 +29,11 @@
 #include <cmath>
 #include <unistd.h>
 
-pthread_cond_t cv         = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t condMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cv         = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t condMutex = PTHREAD_MUTEX_INITIALIZER;
 
 // We declare an auto pointer to ccdsim.
-std::unique_ptr<CCDSim> ccdsim(new CCDSim());
+static std::unique_ptr<CCDSim> ccdsim(new CCDSim());
 
 void ISPoll(void *p);
 
@@ -131,6 +131,8 @@ bool CCDSim::SetupParms()
 
 bool CCDSim::Connect()
 {
+    streamPredicate = 0;
+    terminateThread = false;
     pthread_create(&primary_thread, nullptr, &streamVideoHelper, this);
     SetTimer(POLLMS);
     return true;
@@ -149,7 +151,7 @@ bool CCDSim::Disconnect()
 
 const char *CCDSim::getDefaultName()
 {
-    return (const char *)"CCD Simulator";
+    return static_cast<const char *>("CCD Simulator");
 }
 
 bool CCDSim::initProperties()
@@ -987,21 +989,21 @@ int CCDSim::AddToPixel(INDI::CCDChip *targetChip, int x, int y, int val)
     return drew;
 }
 
-IPState CCDSim::GuideNorth(float v)
+IPState CCDSim::GuideNorth(uint32_t v)
 {
-    guideNSOffset    += v / 1000 * GuideRate / 3600;
+    guideNSOffset    += v / 1000.0 * GuideRate / 3600;
     return IPS_OK;
 }
 
-IPState CCDSim::GuideSouth(float v)
+IPState CCDSim::GuideSouth(uint32_t v)
 {
-    guideNSOffset    += v / -1000 * GuideRate / 3600;
+    guideNSOffset    += v / -1000.0 * GuideRate / 3600;
     return IPS_OK;
 }
 
-IPState CCDSim::GuideEast(float v)
+IPState CCDSim::GuideEast(uint32_t v)
 {
-    float c   = v / 1000 * GuideRate;
+    float c   = v / 1000.0 * GuideRate;
     c   = c/ 3600.0 / 15.0;
     c   = c/ (cos(currentDE * 0.0174532925));
 
@@ -1010,9 +1012,9 @@ IPState CCDSim::GuideEast(float v)
     return IPS_OK;
 }
 
-IPState CCDSim::GuideWest(float v)
+IPState CCDSim::GuideWest(uint32_t v)
 {
-    float c   = v / -1000 * GuideRate;
+    float c   = v / -1000.0 * GuideRate;
     c   = c/ 3600.0 / 15.0;
     c   = c/ (cos(currentDE * 0.0174532925));
 

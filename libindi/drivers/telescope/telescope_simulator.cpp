@@ -28,7 +28,7 @@
 #include <memory>
 
 // We declare an auto pointer to ScopeSim.
-std::unique_ptr<ScopeSim> telescope_sim(new ScopeSim());
+static std::unique_ptr<ScopeSim> telescope_sim(new ScopeSim());
 
 #define GOTO_RATE      6.5      /* slew rate, degrees/s */
 #define SLEW_RATE      2.5      /* slew rate, degrees/s */
@@ -341,9 +341,9 @@ bool ScopeSim::ReadScopeStatus()
             case IPS_BUSY:
 
                 if (MovementWES[DIRECTION_WEST].s == ISS_ON)
-                    currentRA += da_ra / 15.;
-                else if (MovementWES[DIRECTION_EAST].s == ISS_ON)
                     currentRA -= da_ra / 15.;
+                else if (MovementWES[DIRECTION_EAST].s == ISS_ON)
+                    currentRA += da_ra / 15.;
                 break;
 
             default:
@@ -795,28 +795,28 @@ bool ScopeSim::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
     return true;
 }
 
-IPState ScopeSim::GuideNorth(float ms)
+IPState ScopeSim::GuideNorth(uint32_t ms)
 {
     guiderNSTarget[GUIDE_NORTH] = ms;
     guiderNSTarget[GUIDE_SOUTH] = 0;
     return IPS_BUSY;
 }
 
-IPState ScopeSim::GuideSouth(float ms)
+IPState ScopeSim::GuideSouth(uint32_t ms)
 {
     guiderNSTarget[GUIDE_SOUTH] = ms;
     guiderNSTarget[GUIDE_NORTH] = 0;
     return IPS_BUSY;
 }
 
-IPState ScopeSim::GuideEast(float ms)
+IPState ScopeSim::GuideEast(uint32_t ms)
 {
     guiderEWTarget[GUIDE_EAST] = ms;
     guiderEWTarget[GUIDE_WEST] = 0;
     return IPS_BUSY;
 }
 
-IPState ScopeSim::GuideWest(float ms)
+IPState ScopeSim::GuideWest(uint32_t ms)
 {
     guiderEWTarget[GUIDE_WEST] = ms;
     guiderEWTarget[GUIDE_EAST] = 0;

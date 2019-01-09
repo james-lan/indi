@@ -26,6 +26,7 @@
 #include "gphoto_driver.h"
 #include "gphoto_readimage.h"
 
+#include <algorithm>
 #include <stream/streammanager.h>
 
 #include <math.h>
@@ -54,6 +55,8 @@ static CamDriverInfo camInfos[] = { { "indi_gphoto_ccd", "GPhoto CCD", "GPhoto" 
                                     { "indi_canon_ccd", "Canon DSLR", "Canon" },
                                     { "indi_nikon_ccd", "Nikon DSLR", "Nikon" },
                                     { "indi_pentax_ccd", "Pentax DSLR", "Pentax" },
+                                    { "indi_sony_ccd", "Sony DSLR", "Sony" },
+                                    { "indi_fuji_ccd", "Fuji DSLR", "Fuji" },
                                     { nullptr, nullptr, nullptr } };
 
 /**********************************************************
@@ -105,13 +108,13 @@ void ISInit()
             {
                 IDLog("Failed to detect any cameras. Check power and make sure camera is not mounted by other programs "
                       "and try again.\n");
-// Use Legacy Mode
+                // Use Legacy Mode
 #if 0
-             IDLog("No cameras detected. Using legacy mode...");
-             cameraCount = 1;
-             cameras[0] = new GPhotoCCD();
-             atexit(cleanup);
-             isInit = true;
+                IDLog("No cameras detected. Using legacy mode...");
+                cameraCount = 1;
+                cameras[0] = new GPhotoCCD();
+                atexit(cleanup);
+                isInit = true;
 #endif
                 return;
             }
@@ -120,14 +123,20 @@ void ISInit()
             int cameraIndex = 0;
             cameraCount=0;
 
+            std::vector<std::string> cameraNames;
+
             while (availableCameras > 0)
             {
                 gp_list_get_name(list, cameraIndex, &model);
                 gp_list_get_value(list, cameraIndex, &port);
 
+                IDLog("Detected camera model %s on port %s\n", model, port);
+
                 cameraIndex++;
                 availableCameras--;
 
+                // If we're not using the Generic INDI GPhoto drievr
+                // then let's search for multiple cameras
                 if (strcmp(me, "indi_gphoto_ccd"))
                 {
                     char prefix[MAXINDINAME];
@@ -139,11 +148,20 @@ void ISInit()
                         if (strstr(model, camInfos[j].model))
                         {
                             strncpy(prefix, camInfos[j].driver, MAXINDINAME);
-                            snprintf(name, MAXINDIDEVICE, "%s %s", prefix, model + strlen(camInfos[j].model) + 1);
+
+                            // If if the model was already registered for a prior camera in case we are using
+                            // two identical models
+                            if (std::find(cameraNames.begin(), cameraNames.end(), camInfos[j].model) == cameraNames.end())
+                                snprintf(name, MAXINDIDEVICE, "%s %s", prefix, model + strlen(camInfos[j].model) + 1);
+                            else
+                                snprintf(name, MAXINDIDEVICE, "%s %s %d", prefix, model + strlen(camInfos[j].model) + 1,
+                                         static_cast<int>(std::count(cameraNames.begin(), cameraNames.end(), camInfos[j].model))+1);
                             cameras[cameraCount] = new GPhotoCCD(model, port);
                             cameras[cameraCount]->setDeviceName(name);
                             cameraCount++;
                             modelFound = true;
+                            // Store camera model in list to check for duplicates
+                            cameraNames.push_back(camInfos[j].model);
                             break;
                         }
                     }
@@ -263,7 +281,7 @@ GPhotoCCD::GPhotoCCD() : FI(this)
     on_off[0]        = strdup("On");
     on_off[1]        = strdup("Off");
 
-    setVersion(INDI_GPHOTO_VERSION_MAJOR, INDI_GPHOTO_VERSION_MINOR);    
+    setVersion(INDI_GPHOTO_VERSION_MAJOR, INDI_GPHOTO_VERSION_MINOR);
 }
 
 GPhotoCCD::GPhotoCCD(const char *model, const char *port) : FI(this)
@@ -289,7 +307,7 @@ GPhotoCCD::~GPhotoCCD()
 
 const char *GPhotoCCD::getDefaultName()
 {
-    return (const char *)"GPhoto CCD";
+    return "GPhoto CCD";
 }
 
 bool GPhotoCCD::initProperties()
@@ -318,13 +336,13 @@ bool GPhotoCCD::initProperties()
     }*/
     //else
     //{
-        // For now let's set name to default name. In the future, we need to to support multiple devices per one driver
-        if (*getDeviceName() == '\0')
-            strncpy(name, getDefaultName(), MAXINDINAME);
-        else
-            strncpy(name, getDeviceName(), MAXINDINAME);
-        setDeviceName(this->name);
-        //modelFound = true;
+    // For now let's set name to default name. In the future, we need to to support multiple devices per one driver
+    if (*getDeviceName() == '\0')
+        strncpy(name, getDefaultName(), MAXINDINAME);
+    else
+        strncpy(name, getDeviceName(), MAXINDINAME);
+    setDeviceName(this->name);
+    //modelFound = true;
     //}
 
     // Init parent properties first
@@ -362,6 +380,11 @@ bool GPhotoCCD::initProperties()
     IUFillSwitchVector(&livePreviewSP, livePreviewS, 2, getDeviceName(), "AUX_VIDEO_STREAM", "Preview",
                        MAIN_CONTROL_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
+    IUFillSwitch(&streamSubframeS[0], "Enable", "", ISS_OFF);
+    IUFillSwitch(&streamSubframeS[1], "Disable", "", ISS_ON);
+    IUFillSwitchVector(&streamSubframeSP, streamSubframeS, 2, getDeviceName(), "STREAM_SUBFRAME", "Subframe",
+                       "Streaming", IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+
     IUFillSwitch(&captureTargetS[CAPTURE_INTERNAL_RAM], "RAM", "", ISS_ON);
     IUFillSwitch(&captureTargetS[CAPTURE_SD_CARD], "SD Card", "", ISS_OFF);
     IUFillSwitchVector(&captureTargetSP, captureTargetS, 2, getDeviceName(), "CCD_CAPTURE_TARGET", "Capture Target",
@@ -371,6 +394,11 @@ bool GPhotoCCD::initProperties()
     IUFillSwitch(&SDCardImageS[SD_CARD_DELETE_IMAGE], "Delete", "", ISS_OFF);
     IUFillSwitchVector(&SDCardImageSP, SDCardImageS, 2, getDeviceName(), "CCD_SD_CARD_ACTION", "SD Image",
                        IMAGE_SETTINGS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+
+    IUFillSwitch(&forceBULBS[FORCE_BULB_ON], "On", "On", ISS_ON);
+    IUFillSwitch(&forceBULBS[FORCE_BULB_OFF], "Off", "Off", ISS_OFF);
+    IUFillSwitchVector(&forceBULBSP, forceBULBS, 2, getDeviceName(), "CCD_FORCE_BLOB", "Force BULB",
+                       OPTIONS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE", 0.001, 3600, 1, false);
 
@@ -457,8 +485,9 @@ bool GPhotoCCD::updateProperties()
         if (captureTargetSP.s == IPS_OK)
         {
             defineSwitch(&captureTargetSP);
-            defineSwitch(&SDCardImageSP);
         }
+
+        defineSwitch(&SDCardImageSP);
 
         imageBP = getBLOB("CCD1");
         imageB  = imageBP->bp;
@@ -466,13 +495,27 @@ bool GPhotoCCD::updateProperties()
         // Dummy values until first capture is done
         //SetCCDParams(1280, 1024, 8, 5.4, 5.4);
 
-        if (sim == false)
+        if (isSimulation() == false)
         {
             ShowExtendedOptions();
 
             if (strstr(gphoto_get_manufacturer(gphotodrv), "Canon"))
                 defineNumber(&mMirrorLockNP);
         }
+
+        if (isSimulation())
+            isTemperatureSupported = false;
+        else
+            isTemperatureSupported = gphoto_supports_temperature(gphotodrv);
+
+        if (isTemperatureSupported)
+        {
+            TemperatureNP.p = IP_RO;
+            defineNumber(&TemperatureNP);
+        }
+
+        defineSwitch(&streamSubframeSP);
+        defineSwitch(&forceBULBSP);
 
         //timerID = SetTimer(POLLMS);
     }
@@ -495,11 +538,17 @@ bool GPhotoCCD::updateProperties()
         if (captureTargetSP.s != IPS_IDLE)
         {
             deleteProperty(captureTargetSP.name);
-            deleteProperty(SDCardImageSP.name);
         }
 
+        if (isTemperatureSupported)
+            deleteProperty(TemperatureNP.name);
+
+        deleteProperty(SDCardImageSP.name);
+
+        deleteProperty(streamSubframeSP.name);
+        deleteProperty(forceBULBSP.name);
+
         HideExtendedOptions();
-        //rmTimer(timerID);
     }
 
     return true;
@@ -557,13 +606,58 @@ bool GPhotoCCD::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             {
                 if (mIsoS[i].s == ISS_ON)
                 {
-                    if (sim == false)
+                    if (isSimulation() == false)
                         gphoto_set_iso(gphotodrv, i);
                     mIsoSP.s = IPS_OK;
                     IDSetSwitch(&mIsoSP, nullptr);
                     break;
                 }
             }
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        // Force BULB
+        // This force driver to _always_ capture in bulb mode and never use predefined exposures unless the exposures are less
+        // than a second.
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        if (!strcmp(name, forceBULBSP.name))
+        {
+            if (IUUpdateSwitch(&forceBULBSP, states, names, n) < 0)
+                return false;
+
+            forceBULBSP.s = IPS_OK;
+            if (forceBULBS[FORCE_BULB_ON].s == ISS_ON)
+            {
+                if (isSimulation() == false)
+                    gphoto_force_bulb(gphotodrv, true);
+                LOG_INFO("Force BULB is enabled. All expsures shall be captured in BULB mode except for subsecond captures.");
+            }
+            else
+            {
+                if (isSimulation() == false)
+                    gphoto_force_bulb(gphotodrv, false);
+                LOG_INFO("Force BULB is disabled. Exposures shall utilize camera predefined exposures time first before attempting BULB.");
+            }
+
+            IDSetSwitch(&forceBULBSP, nullptr);
+            return true;
+        }
+
+        if (!strcmp(name, streamSubframeSP.name))
+        {
+            if (IUUpdateSwitch(&streamSubframeSP, states, names, n) < 0)
+                return false;
+
+            streamSubframeSP.s = IPS_OK;
+            IDSetSwitch(&streamSubframeSP, nullptr);
+
+            if (streamSubframeS[0].s == ISS_ON)
+                Streamer->setPixelFormat(INDI_RGB);
+            // otherwise, we send raw JPG
+            else
+                Streamer->setPixelFormat(INDI_JPG);
+
+            return true;
         }
 
         if (!strcmp(name, mExposurePresetSP.name))
@@ -619,7 +713,7 @@ bool GPhotoCCD::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             {
                 if (mFormatS[i].s == ISS_ON)
                 {
-                    if (sim == false)
+                    if (isSimulation() == false)
                         gphoto_set_format(gphotodrv, i);
                     mFormatSP.s = IPS_OK;
                     IDSetSwitch(&mFormatSP, nullptr);
@@ -695,20 +789,20 @@ bool GPhotoCCD::ISNewSwitch(const char *dev, const char *name, ISState *states, 
         {
             const char *onSwitch = IUFindOnSwitchName(states, names, n);
             int captureTarget =
-                (!strcmp(onSwitch, captureTargetS[CAPTURE_INTERNAL_RAM].name) ? CAPTURE_INTERNAL_RAM : CAPTURE_SD_CARD);
+                    (!strcmp(onSwitch, captureTargetS[CAPTURE_INTERNAL_RAM].name) ? CAPTURE_INTERNAL_RAM : CAPTURE_SD_CARD);
             int ret = gphoto_set_capture_target(gphotodrv, captureTarget);
             if (ret == GP_OK)
             {
                 captureTargetSP.s = IPS_OK;
                 IUUpdateSwitch(&captureTargetSP, states, names, n);
                 LOGF_INFO("Capture target set to %s",
-                       (captureTarget == CAPTURE_INTERNAL_RAM) ? "Internal RAM" : "SD Card");
+                          (captureTarget == CAPTURE_INTERNAL_RAM) ? "Internal RAM" : "SD Card");
             }
             else
             {
                 captureTargetSP.s = IPS_ALERT;
                 LOGF_INFO("Failed to set capture target set to %s",
-                       (captureTarget == CAPTURE_INTERNAL_RAM) ? "Internal RAM" : "SD Card");
+                          (captureTarget == CAPTURE_INTERNAL_RAM) ? "Internal RAM" : "SD Card");
             }
 
             IDSetSwitch(&captureTargetSP, nullptr);
@@ -746,7 +840,7 @@ bool GPhotoCCD::ISNewSwitch(const char *dev, const char *name, ISState *states, 
         {
             cam_opt *opt = CamOptions[name];
             if (opt->widget->type != GP_WIDGET_RADIO && opt->widget->type != GP_WIDGET_MENU &&
-                opt->widget->type != GP_WIDGET_TOGGLE)
+                    opt->widget->type != GP_WIDGET_TOGGLE)
             {
                 LOGF_ERROR("ERROR: Property '%s'is not a switch (%d)", name, opt->widget->type);
                 return false;
@@ -829,8 +923,6 @@ bool GPhotoCCD::ISNewNumber(const char *dev, const char *name, double values[], 
 
 bool GPhotoCCD::Connect()
 {
-    sim = isSimulation();
-
     int setidx;
     char **options;
     int max_opts;
@@ -842,7 +934,7 @@ bool GPhotoCCD::Connect()
         shutter_release_port = PortTP.tp[0].text;
     }
 
-    if (sim == false)
+    if (isSimulation() == false)
     {
         // Regular detect
         if (port[0] == '\0')
@@ -852,12 +944,12 @@ bool GPhotoCCD::Connect()
         if (gphotodrv == nullptr)
         {
             LOG_ERROR("Can not open camera: Power OK? If camera is auto-mounted as external disk "
-                                           "storage, please unmount it and disable auto-mount.");
+                      "storage, please unmount it and disable auto-mount.");
             return false;
         }
     }
 
-    if (sim)
+    if (isSimulation())
     {
         PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE", 0.001, 3600, 1, true);
     }
@@ -875,12 +967,13 @@ bool GPhotoCCD::Connect()
         mFormatS = nullptr;
     }
 
-    if (sim)
+    const char *fmts[] = { "Custom" };
+
+    if (isSimulation())
     {
         setidx             = 0;
         max_opts           = 1;
-        const char *fmts[] = { "Custom" };
-        options            = (char **)fmts;
+        options            = const_cast<char **>(fmts);
     }
     else
     {
@@ -923,12 +1016,12 @@ bool GPhotoCCD::Connect()
     if (mIsoS)
         free(mIsoS);
 
-    if (sim)
+    const char *isos[] = { "100", "200", "400", "800" };
+    if (isSimulation())
     {
-        setidx             = 0;
-        max_opts           = 4;
-        const char *isos[] = { "100", "200", "400", "800" };
-        options            = (char **)isos;
+        setidx   = 0;
+        max_opts = 4;
+        options  = const_cast<char **>(isos);
     }
     else
     {
@@ -946,12 +1039,12 @@ bool GPhotoCCD::Connect()
         mExposurePresetS = nullptr;
     }
 
-    if (sim)
+    const char *exposureList[] = { "1/8", "1/4", "1/2", "bulb" };
+    if (isSimulation())
     {
-        setidx                     = 0;
-        max_opts                   = 4;
-        const char *exposureList[] = { "1/8", "1/4", "1/2", "bulb" };
-        options                    = (char **)exposureList;
+        setidx   = 0;
+        max_opts = 4;
+        options  = const_cast<char **>(exposureList);
     }
     else
     {
@@ -970,7 +1063,7 @@ bool GPhotoCCD::Connect()
     // Get Capture target
     int captureTarget = -1;
 
-    if (!sim && gphoto_get_capture_target(gphotodrv, &captureTarget) == GP_OK)
+    if (!isSimulation() && gphoto_get_capture_target(gphotodrv, &captureTarget) == GP_OK)
     {
         IUResetSwitch(&captureTargetSP);
         captureTargetS[CAPTURE_INTERNAL_RAM].s = (captureTarget == 0) ? ISS_ON : ISS_OFF;
@@ -980,10 +1073,10 @@ bool GPhotoCCD::Connect()
 
     LOGF_INFO("%s is online.", getDeviceName());
 
-    if (!sim && gphoto_get_manufacturer(gphotodrv) && gphoto_get_model(gphotodrv))
+    if (!isSimulation() && gphoto_get_manufacturer(gphotodrv) && gphoto_get_model(gphotodrv))
     {
         LOGF_INFO("Detected %s Model %s.", gphoto_get_manufacturer(gphotodrv),
-               gphoto_get_model(gphotodrv));
+                  gphoto_get_model(gphotodrv));
     }
 
     frameInitialized = false;
@@ -993,7 +1086,7 @@ bool GPhotoCCD::Connect()
 
 bool GPhotoCCD::Disconnect()
 {
-    if (sim)
+    if (isSimulation())
         return true;
     gphoto_close(gphotodrv);
     gphotodrv        = nullptr;
@@ -1007,8 +1100,8 @@ bool GPhotoCCD::StartExposure(float duration)
     if (PrimaryCCD.getPixelSizeX() == 0)
     {
         LOG_INFO("Please update the CCD Information in the Image Info section before "
-                                         "proceeding. The camera resolution shall be updated after the first exposure "
-                                         "is complete.");
+                 "proceeding. The camera resolution shall be updated after the first exposure "
+                 "is complete.");
         return false;
     }
 
@@ -1033,11 +1126,16 @@ bool GPhotoCCD::StartExposure(float duration)
      */
 
     // Microseconds
-    int exp_us = (int)ceil(duration * 1e6);
+    uint32_t exp_us = static_cast<uint32_t>(ceil(duration * 1e6));
 
     PrimaryCCD.setExposureDuration(duration);
 
-    if (sim == false && gphoto_start_exposure(gphotodrv, exp_us, mMirrorLockN[0].value) < 0)
+    if (mMirrorLockN[0].value > 0)
+        LOGF_INFO("Starting %g seconds exposure (+%g seconds mirror lock).", duration, mMirrorLockN[0].value);
+    else
+        LOGF_INFO("Starting %g seconds exposure.", duration);
+
+    if (isSimulation() == false && gphoto_start_exposure(gphotodrv, exp_us, mMirrorLockN[0].value) < 0)
     {
         LOG_ERROR("Error starting exposure");
         return false;
@@ -1046,8 +1144,6 @@ bool GPhotoCCD::StartExposure(float duration)
     ExposureRequest = duration;
     gettimeofday(&ExpStart, nullptr);
     InExposure = true;
-
-    LOGF_INFO("Starting %g sec exposure", duration);
 
     SetTimer(POLLMS);
 
@@ -1075,16 +1171,12 @@ bool GPhotoCCD::UpdateCCDFrame(int x, int y, int w, int h)
 
 double GPhotoCCD::CalcTimeLeft()
 {
-    double timesince;
-    double timeleft;
-    struct timeval now;
+    struct timeval now, diff;
     gettimeofday(&now, nullptr);
 
-    timesince = (double)(now.tv_sec * 1000.0 + now.tv_usec / 1000) -
-                (double)(ExpStart.tv_sec * 1000.0 + ExpStart.tv_usec / 1000);
-    timesince = timesince / 1000;
-    timeleft  = ExposureRequest - timesince;
-    return timeleft;
+    timersub(&now, &ExpStart, &diff);
+    double timesince = diff.tv_sec + diff.tv_usec / 1000000.0;
+    return (ExposureRequest - timesince);
 }
 
 void GPhotoCCD::TimerHit()
@@ -1107,7 +1199,7 @@ void GPhotoCCD::TimerHit()
         }
     }
 
-/*
+    /*
     if (livePreviewSP.s == IPS_BUSY)
     {
         bool rc = startLivePreview();
@@ -1172,11 +1264,35 @@ void GPhotoCCD::TimerHit()
                 {
                     PrimaryCCD.setExposureFailed();
                 }
+
+                if (isTemperatureSupported)
+                {
+                    double cameraTemperature = static_cast<double>(gphoto_get_last_sensor_temperature(gphotodrv));
+                    if (cameraTemperature != TemperatureN[0].value)
+                    {
+                        // Check if we are getting bogus temperature values and set property to alert
+                        // unless it is already set
+                        if (cameraTemperature < MINUMUM_CAMERA_TEMPERATURE)
+                        {
+                            if (TemperatureNP.s != IPS_ALERT)
+                            {
+                                TemperatureNP.s = IPS_ALERT;
+                                IDSetNumber(&TemperatureNP, nullptr);
+                            }
+                        }
+                        else
+                        {
+                            TemperatureNP.s = IPS_OK;
+                            TemperatureN[0].value = cameraTemperature;
+                            IDSetNumber(&TemperatureNP, nullptr);
+                        }
+                    }
+                }
             }
         }
         else
         {
-            LOGF_DEBUG("Capture in progress. Time left %.2f", timeleft);
+            //LOGF_DEBUG("Capture in progress. Time left %.2f seconds", timeleft);
             if (timerID == -1)
                 SetTimer(POLLMS);
         }
@@ -1215,7 +1331,7 @@ bool GPhotoCCD::grabImage()
     size_t memsize = 0;
     int fd = 0, naxis = 2, w = 0, h = 0, bpp = 8;
 
-    if (sim)
+    if (isSimulation())
     {
         w                   = PrimaryCCD.getXRes();
         h                   = PrimaryCCD.getYRes();
@@ -1282,7 +1398,7 @@ bool GPhotoCCD::grabImage()
         LOG_INFO("Exposure done, downloading image...");
 
         if (strcasecmp(gphoto_get_file_extension(gphotodrv), "jpg") == 0 ||
-            strcasecmp(gphoto_get_file_extension(gphotodrv), "jpeg") == 0)
+                strcasecmp(gphoto_get_file_extension(gphotodrv), "jpeg") == 0)
         {
             if (read_jpeg(tmpfile, &memptr, &memsize, &naxis, &w, &h))
             {
@@ -1292,7 +1408,7 @@ bool GPhotoCCD::grabImage()
             }
 
             LOGF_DEBUG("read_jpeg: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d)", memsize, naxis,
-                   w, h, bpp);
+                       w, h, bpp);
 
             SetCCDCapability(GetCCDCapability() & ~CCD_HAS_BAYER);
         }
@@ -1317,7 +1433,7 @@ bool GPhotoCCD::grabImage()
             }
 
             LOGF_DEBUG("read_libraw: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d) pattern (%s)",
-                   memsize, naxis, w, h, bpp, bayer_pattern);
+                       memsize, naxis, w, h, bpp, bayer_pattern);
 
             unlink(tmpfile);
 
@@ -1465,43 +1581,43 @@ void GPhotoCCD::UpdateWidget(cam_opt *opt)
 
     switch (opt->widget->type)
     {
-        case GP_WIDGET_RADIO:
-        case GP_WIDGET_MENU:
-            for (int i = 0; i < opt->widget->choice_cnt; i++)
-                opt->item.sw[i].s = opt->widget->value.index == i ? ISS_ON : ISS_OFF;
-            IDSetSwitch(&opt->prop.sw, nullptr);
-            break;
-        case GP_WIDGET_TEXT:
-            free(opt->item.text.text);
-            opt->item.text.text = strdup(opt->widget->value.text);
-            IDSetText(&opt->prop.text, nullptr);
-            break;
-        case GP_WIDGET_TOGGLE:
-            if (opt->widget->value.toggle)
-            {
-                opt->item.sw[0].s = ISS_ON;
-                opt->item.sw[0].s = ISS_OFF;
-            }
-            else
-            {
-                opt->item.sw[0].s = ISS_OFF;
-                opt->item.sw[0].s = ISS_ON;
-            }
-            IDSetSwitch(&opt->prop.sw, nullptr);
-            break;
-        case GP_WIDGET_RANGE:
-            opt->item.num.value = opt->widget->value.num;
-            IDSetNumber(&opt->prop.num, nullptr);
-            break;
-        case GP_WIDGET_DATE:
-            free(opt->item.text.text);
-            tm                  = gmtime((time_t *)&opt->widget->value.date);
-            opt->item.text.text = strdup(asctime(tm));
-            IDSetText(&opt->prop.text, nullptr);
-            break;
-        default:
-            delete opt;
-            return;
+    case GP_WIDGET_RADIO:
+    case GP_WIDGET_MENU:
+        for (int i = 0; i < opt->widget->choice_cnt; i++)
+            opt->item.sw[i].s = opt->widget->value.index == i ? ISS_ON : ISS_OFF;
+        IDSetSwitch(&opt->prop.sw, nullptr);
+        break;
+    case GP_WIDGET_TEXT:
+        free(opt->item.text.text);
+        opt->item.text.text = strdup(opt->widget->value.text);
+        IDSetText(&opt->prop.text, nullptr);
+        break;
+    case GP_WIDGET_TOGGLE:
+        if (opt->widget->value.toggle)
+        {
+            opt->item.sw[0].s = ISS_ON;
+            opt->item.sw[0].s = ISS_OFF;
+        }
+        else
+        {
+            opt->item.sw[0].s = ISS_OFF;
+            opt->item.sw[0].s = ISS_ON;
+        }
+        IDSetSwitch(&opt->prop.sw, nullptr);
+        break;
+    case GP_WIDGET_RANGE:
+        opt->item.num.value = opt->widget->value.num;
+        IDSetNumber(&opt->prop.num, nullptr);
+        break;
+    case GP_WIDGET_DATE:
+        free(opt->item.text.text);
+        tm                  = gmtime((time_t *)&opt->widget->value.date);
+        opt->item.text.text = strdup(asctime(tm));
+        IDSetText(&opt->prop.text, nullptr);
+        break;
+    default:
+        delete opt;
+        return;
     }
 }
 
@@ -1520,41 +1636,41 @@ void GPhotoCCD::AddWidget(gphoto_widget *widget)
 
     switch (widget->type)
     {
-        case GP_WIDGET_RADIO:
-        case GP_WIDGET_MENU:
-            opt->item.sw = create_switch(widget->name, widget->choices, widget->choice_cnt, widget->value.index);
-            IUFillSwitchVector(&opt->prop.sw, opt->item.sw, widget->choice_cnt, getDeviceName(), widget->name,
-                               widget->name, widget->parent, perm, ISR_1OFMANY, 60, IPS_IDLE);
-            IDDefSwitch(&opt->prop.sw, nullptr);
-            break;
-        case GP_WIDGET_TEXT:
-            IUFillText(&opt->item.text, widget->name, widget->name, widget->value.text);
-            IUFillTextVector(&opt->prop.text, &opt->item.text, 1, getDeviceName(), widget->name, widget->name,
-                             widget->parent, perm, 60, IPS_IDLE);
-            IDDefText(&opt->prop.text, nullptr);
-            break;
-        case GP_WIDGET_TOGGLE:
-            opt->item.sw = create_switch(widget->name, (char **)on_off, 2, widget->value.toggle ? 0 : 1);
-            IUFillSwitchVector(&opt->prop.sw, opt->item.sw, 2, getDeviceName(), widget->name, widget->name,
-                               widget->parent, perm, ISR_1OFMANY, 60, IPS_IDLE);
-            IDDefSwitch(&opt->prop.sw, nullptr);
-            break;
-        case GP_WIDGET_RANGE:
-            IUFillNumber(&opt->item.num, widget->name, widget->name, "%5.2f", widget->min, widget->max, widget->step,
-                         widget->value.num);
-            IUFillNumberVector(&opt->prop.num, &opt->item.num, 1, getDeviceName(), widget->name, widget->name,
-                               widget->parent, perm, 60, IPS_IDLE);
-            break;
-        case GP_WIDGET_DATE:
-            tm = gmtime((time_t *)&widget->value.date);
-            IUFillText(&opt->item.text, widget->name, widget->name, asctime(tm));
-            IUFillTextVector(&opt->prop.text, &opt->item.text, 1, getDeviceName(), widget->name, widget->name,
-                             widget->parent, perm, 60, IPS_IDLE);
-            IDDefText(&opt->prop.text, nullptr);
-            break;
-        default:
-            delete opt;
-            return;
+    case GP_WIDGET_RADIO:
+    case GP_WIDGET_MENU:
+        opt->item.sw = create_switch(widget->name, widget->choices, widget->choice_cnt, widget->value.index);
+        IUFillSwitchVector(&opt->prop.sw, opt->item.sw, widget->choice_cnt, getDeviceName(), widget->name,
+                           widget->name, widget->parent, perm, ISR_1OFMANY, 60, IPS_IDLE);
+        IDDefSwitch(&opt->prop.sw, nullptr);
+        break;
+    case GP_WIDGET_TEXT:
+        IUFillText(&opt->item.text, widget->name, widget->name, widget->value.text);
+        IUFillTextVector(&opt->prop.text, &opt->item.text, 1, getDeviceName(), widget->name, widget->name,
+                         widget->parent, perm, 60, IPS_IDLE);
+        IDDefText(&opt->prop.text, nullptr);
+        break;
+    case GP_WIDGET_TOGGLE:
+        opt->item.sw = create_switch(widget->name, (char **)on_off, 2, widget->value.toggle ? 0 : 1);
+        IUFillSwitchVector(&opt->prop.sw, opt->item.sw, 2, getDeviceName(), widget->name, widget->name,
+                           widget->parent, perm, ISR_1OFMANY, 60, IPS_IDLE);
+        IDDefSwitch(&opt->prop.sw, nullptr);
+        break;
+    case GP_WIDGET_RANGE:
+        IUFillNumber(&opt->item.num, widget->name, widget->name, "%5.2f", widget->min, widget->max, widget->step,
+                     widget->value.num);
+        IUFillNumberVector(&opt->prop.num, &opt->item.num, 1, getDeviceName(), widget->name, widget->name,
+                           widget->parent, perm, 60, IPS_IDLE);
+        break;
+    case GP_WIDGET_DATE:
+        tm = gmtime((time_t *)&widget->value.date);
+        IUFillText(&opt->item.text, widget->name, widget->name, asctime(tm));
+        IUFillTextVector(&opt->prop.text, &opt->item.text, 1, getDeviceName(), widget->name, widget->name,
+                         widget->parent, perm, 60, IPS_IDLE);
+        IDDefText(&opt->prop.text, nullptr);
+        break;
+    default:
+        delete opt;
+        return;
     }
 
     CamOptions[widget->name] = opt;
@@ -1591,17 +1707,17 @@ void GPhotoCCD::HideExtendedOptions(void)
 
         switch (opt->widget->type)
         {
-            case GP_WIDGET_RADIO:
-            case GP_WIDGET_MENU:
-            case GP_WIDGET_TOGGLE:
-                free(opt->item.sw);
-                break;
-            case GP_WIDGET_TEXT:
-            case GP_WIDGET_DATE:
-                free(opt->item.text.text);
-                break;
-            default:
-                break;
+        case GP_WIDGET_RADIO:
+        case GP_WIDGET_MENU:
+        case GP_WIDGET_TOGGLE:
+            free(opt->item.sw);
+            break;
+        case GP_WIDGET_TEXT:
+        case GP_WIDGET_DATE:
+            free(opt->item.text.text);
+            break;
+        default:
+            break;
         }
 
         delete opt;
@@ -1615,7 +1731,7 @@ IPState GPhotoCCD::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
 
     /* gphoto works with steps */
 
-    if (sim || speed == 0)
+    if (isSimulation() || speed == 0)
         return IPS_OK;
 
     if (dir == FOCUS_INWARD)
@@ -1657,7 +1773,13 @@ bool GPhotoCCD::StartStreaming()
 
     if (gphoto_start_preview(gphotodrv) == GP_OK)
     {
-        Streamer->setPixelFormat(INDI_JPG);
+        // If we're subframing, then we send RGB
+        if (streamSubframeS[0].s == ISS_ON)
+            Streamer->setPixelFormat(INDI_RGB);
+        // otherwise, we send raw JPG
+        else
+            Streamer->setPixelFormat(INDI_JPG);
+
         SetTimer(STREAMPOLLMS);
         return true;
     }
@@ -1673,9 +1795,7 @@ bool GPhotoCCD::StopStreaming()
 
 bool GPhotoCCD::startLiveVideo()
 {
-    //static int last_naxis = -1;, last_w = -1, last_h = -1;
-
-    if (sim)
+    if (isSimulation())
         return false;
 
     int rc = GP_OK;
@@ -1703,6 +1823,7 @@ bool GPhotoCCD::startLiveVideo()
     if (rc != GP_OK)
     {
         LOGF_ERROR("%s", errMsg);
+        gp_file_unref(previewFile);
         return false;
     }
 
@@ -1712,28 +1833,28 @@ bool GPhotoCCD::startLiveVideo()
         if (rc != GP_OK)
         {
             LOGF_ERROR("Error getting preview image data and size: %s", gp_result_as_string(rc));
+            gp_file_unref(previewFile);
             return false;
         }
     }
 
-    /*if (PrimaryCCD.getSubW() != w || PrimaryCCD.getSubH() != h)
-    {
-        Streamer->setSize(w, h);
-        PrimaryCCD.setFrame(0, 0, w, h);
-    }*/
-
     unsigned char *inBuffer = (unsigned char *)(const_cast<char *>(previewData));
-    if (liveVideoWidth <= 0)
-    {
-        read_jpeg_size(inBuffer, previewSize, &liveVideoWidth, &liveVideoHeight);
-        Streamer->setSize(liveVideoWidth,liveVideoHeight);
-    }
-    Streamer->newFrame(inBuffer, previewSize);
 
-#if 0
+    if (streamSubframeS[1].s == ISS_ON)
+    {
+        if (liveVideoWidth <= 0)
+        {
+            read_jpeg_size(inBuffer, previewSize, &liveVideoWidth, &liveVideoHeight);
+            Streamer->setSize(liveVideoWidth,liveVideoHeight);
+        }
+
+        Streamer->newFrame(inBuffer, previewSize);
+        gp_file_unref(previewFile);
+
+        return true;
+    }
 
     uint8_t *ccdBuffer      = PrimaryCCD.getFrameBuffer();
-    unsigned char *inBuffer = (unsigned char *)(const_cast<char *>(previewData));
     size_t size             = 0;
     int w=0, h=0, naxis=0;
 
@@ -1743,12 +1864,7 @@ bool GPhotoCCD::startLiveVideo()
     if (rc != 0)
     {
         LOG_ERROR("Error getting live video frame.");
-
-        if (previewFile)
-        {
-            gp_file_unref(previewFile);
-            previewFile = nullptr;
-        }
+        gp_file_unref(previewFile);
         return false;
     }
 
@@ -1756,15 +1872,12 @@ bool GPhotoCCD::startLiveVideo()
 
     if (naxis != PrimaryCCD.getNAxis())
     {
-        if (naxis == 3)
-            Streamer->setPixelFormat(INDI_JPG);
-        else
+        if (naxis == 1)
             Streamer->setPixelFormat(INDI_MONO);
 
         PrimaryCCD.setNAxis(naxis);
     }
 
-    //if (last_w != w || last_h != h)
     if (PrimaryCCD.getSubW() != w || PrimaryCCD.getSubH() != h)
     {
         Streamer->setSize(w, h);
@@ -1774,22 +1887,16 @@ bool GPhotoCCD::startLiveVideo()
     if (PrimaryCCD.getFrameBufferSize() != static_cast<int>(size))
         PrimaryCCD.setFrameBufferSize(size, false);
 
-    if (previewFile)
-    {
-        gp_file_unref(previewFile);
-        previewFile = nullptr;
-    }
+    Streamer->newFrame(ccdBuffer, size);
 
-    Streamer->newFrame();
-#endif
-
+    gp_file_unref(previewFile);
     return true;
 }
 
 #if 0
 bool GPhotoCCD::startLivePreview()
 {
-    if (sim)
+    if (isSimulation())
         return false;
 
     int rc = GP_OK;
@@ -1852,7 +1959,7 @@ bool GPhotoCCD::startLivePreview()
 
 bool GPhotoCCD::stopLiveVideo()
 {
-    if (sim)
+    if (isSimulation())
         return false;
 
     return (gphoto_stop_preview(gphotodrv) == GP_OK);
@@ -1889,7 +1996,13 @@ bool GPhotoCCD::saveConfigItems(FILE *fp)
         IUSaveConfigSwitch(fp, &mFormatSP);
 
     // Transfer Format
-    IUSaveConfigSwitch(fp, &transferFormatSP);    
+    IUSaveConfigSwitch(fp, &transferFormatSP);
+
+    // Subframe Stream
+    IUSaveConfigSwitch(fp, &streamSubframeSP);
+
+    // Force BULB Mode
+    IUSaveConfigSwitch(fp, &forceBULBSP);
 
     return true;
 }
@@ -1911,11 +2024,16 @@ void GPhotoCCD::addFITSKeywords(fitsfile *fptr, INDI::CCDChip *targetChip)
                 fits_update_key_s(fptr, TUINT, "ISOSPEED", &isoSpeed, "ISO Speed", &status);
         }
     }
+
+    if (isTemperatureSupported)
+    {
+        fits_update_key_s(fptr, TDOUBLE, "CCD-TEMP", &(TemperatureN[0].value), "CCD Temperature (Celsius)", &status);
+    }
 }
 
 bool GPhotoCCD::UpdateCCDUploadMode(CCD_UPLOAD_MODE mode)
 {
-    if (!sim)
+    if (!isSimulation())
         gphoto_set_upload_settings(gphotodrv, mode);
     return true;
 }

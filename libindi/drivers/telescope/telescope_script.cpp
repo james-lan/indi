@@ -43,7 +43,7 @@ typedef enum
     SCRIPT_COUNT
 } scripts;
 
-std::unique_ptr<ScopeScript> scope_script(new ScopeScript());
+static std::unique_ptr<ScopeScript> scope_script(new ScopeScript());
 
 void ISGetProperties(const char *dev)
 {
@@ -186,7 +186,7 @@ bool ScopeScript::RunScript(int script, ...)
       strcat(dbg, args[i]);
       strcat(dbg, "'");
     }
-    strcat(dbg, ", NULL)");
+    strcat(dbg, ", nullptr)");
     LOG_DEBUG(dbg);
   }
   
@@ -243,8 +243,6 @@ bool ScopeScript::Disconnect()
 bool ScopeScript::ReadScopeStatus()
 {
     char name[1024];
-    char *s = tmpnam(name);
-    INDI_UNUSED(s);
     bool status = RunScript(SCRIPT_STATUS, name, nullptr);
     if (status)
     {

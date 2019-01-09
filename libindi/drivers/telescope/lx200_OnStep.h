@@ -24,7 +24,16 @@
     ===========================================
     Version 1.4: Tuning
     - James Lan implementation of High Precision Tracking
-    - Todo Focuser absolute seting and initiliszation
+    - James lan Focuser Code
+    - James lan PEC
+    - James Lan Alignment
+    - Azwing set all com variable legth to RB_MAX_LEN otherwise crash due to overflow
+    - Azwing set local variable size to RB_MAX_LEN otherwise erased by overflow preventing Align and other stuf to work
+    - James Lan Align Tab implementation
+    - Azwing Removed Alignment in main tab
+    - Azwing minor typo fixes
+    - Azwing reworked TrackState especially for parking/unparking
+
     Version 1.3: Complete rework of interface and functionalities
     - Telescope Status using :GU#
     - Parking Management
@@ -47,6 +56,8 @@
 #include <unistd.h>
 #include <termios.h>
 
+#define RB_MAX_LEN 64
+
 #define setParkOnStep(fd)  write(fd, "#:hQ#", 5)
 #define ReticPlus(fd)      write(fd, "#:B+#", 5)
 #define ReticMoins(fd)     write(fd, "#:B-#", 5)
@@ -55,6 +66,7 @@
 #define OnStepalign3(fd)   write(fd, "#:A3#", 5)
 #define OnStepalignOK(fd)   write(fd, "#:A+#", 5)
 #define OnStep
+#define RB_MAX_LEN 64
 
 enum Errors {ERR_NONE, ERR_MOTOR_FAULT, ERR_ALT, ERR_LIMIT_SENSE, ERR_DEC, ERR_AZM, ERR_UNDER_POLE, ERR_MERIDIAN, ERR_SYNC};
 
@@ -83,9 +95,9 @@ class LX200_OnStep : public LX200Generic, public INDI::FocuserInterface
     virtual bool setLocalDate(uint8_t days, uint8_t months, uint16_t years) override;
     virtual bool ReadScopeStatus() override;
     virtual int setSiteLongitude(int fd, double Long);
-    virtual bool GetAlignStatus();
-    virtual bool kdedialog(const char * commande);
-    
+//azwing align    virtual bool GetAlignStatus();
+//azwing align    virtual bool kdedialog(const char * commande);
+    virtual bool SetTrackRate(double raRate, double deRate) override;
     
     
     //FocuserInterface
@@ -97,6 +109,35 @@ class LX200_OnStep : public LX200Generic, public INDI::FocuserInterface
 
     
     //End FocuserInterface
+    
+    //PECInterface 
+    //axis 0=RA, 1=DEC, others? 
+    IPState StopPECPlayback (int axis);
+    IPState StartPECPlayback (int axis);
+    IPState ClearPECBuffer (int axis);
+    IPState StartPECRecord (int axis);
+    IPState SavePECBuffer (int axis);
+    IPState PECStatus (int axis);
+    IPState ReadPECBuffer (int axis);
+    IPState WritePECBuffer (int axis);
+    bool ISPECRecorded (int axis);
+    //End PECInterface
+    
+    
+    //NewGeometricAlignment    
+    IPState AlignStartGeometric(int stars);
+    IPState AlignAddStar();
+    IPState AlignDone();
+    virtual bool UpdateAlignStatus();
+    virtual bool UpdateAlignErr();
+    //End NewGeometricAlignment 
+    
+    
+    //Outputs
+    IPState OSEnableOutput(int output);
+    IPState OSDisableOutput(int output);
+    bool OSGetOutputState(int output);
+    
 
     bool sendOnStepCommand(const char *cmd);
     bool sendOnStepCommandBlind(const char *cmd);
@@ -136,20 +177,10 @@ class LX200_OnStep : public LX200Generic, public INDI::FocuserInterface
 
     // Focuser controls
     // Focuser 1
-    //ISwitchVectorProperty OSFocus1SelSP;
-    //ISwitch OSFocus1SelS[2];
     bool OSFocuser1=false;
-    ISwitchVectorProperty OSFocus1RateSP;
-    ISwitch OSFocus1RateS[4];
+    ISwitchVectorProperty OSFocus1InitializeSP;
+    ISwitch OSFocus1InitializeS[4];
 
-    ISwitchVectorProperty OSFocus1MotionSP;
-    ISwitch OSFocus1MotionS[3];
-
-    INumberVectorProperty OSFocus1TargNP;
-    INumber OSFocus1TargN[1];
-
-    INumberVectorProperty OSFocus1TargRelNP;
-    INumber OSFocus1TargRelN[1];
     // Focuser 2
     //ISwitchVectorProperty OSFocus2SelSP;
     //ISwitch OSFocus2SelS[2];
@@ -171,28 +202,62 @@ class LX200_OnStep : public LX200Generic, public INDI::FocuserInterface
     ISwitch ReticS[2];
 
     // Align Buttons
-    ISwitchVectorProperty OSAlignSP;
-    ISwitch OSAlignS[4];
-    IText OSAlignT[1] {};
-    ITextVectorProperty OSAlignTP;
+//azwing align    ISwitchVectorProperty OSAlignSP;
+//azwing align    ISwitch OSAlignS[4];
+//azwing align    IText OSAlignT[1] {};
+//azwing align    ITextVectorProperty OSAlignTP;
 
     ISwitchVectorProperty TrackCompSP;
     ISwitch TrackCompS[3];
+    
+    ISwitchVectorProperty FrequencyAdjustSP;
+    ISwitch FrequencyAdjustS[3];
 
+    ISwitchVectorProperty AutoFlipSP;
+    ISwitch AutoFlipS[2];
+    
+    ISwitchVectorProperty HomePauseSP;
+    ISwitch HomePauseS[3];    
+    
     ISwitchVectorProperty SetHomeSP;
     ISwitch SetHomeS[2];
 
-    char OSStat[20];
-    char OldOSStat[20];
+    
+    ISwitchVectorProperty OSPECStatusSP;
+    ISwitch OSPECStatusS[5];
+    ISwitchVectorProperty OSPECIndexSP;
+    ISwitch OSPECIndexS[2];
+    ISwitchVectorProperty OSPECRecordSP;
+    ISwitch OSPECRecordS[3];
+    ISwitchVectorProperty OSPECReadSP;
+    ISwitch OSPECReadS[2];
+    
+    ISwitchVectorProperty OSNAlignStarsSP;
+    ISwitch OSNAlignStarsS[7];
+    ISwitchVectorProperty OSNAlignSP;
+    ISwitch OSNAlignS[4];
+    IText OSNAlignT[8] {};
+    ITextVectorProperty OSNAlignTP;
+    IText OSNAlignErrT[4] {};
+    ITextVectorProperty OSNAlignErrTP;    
+    char OSNAlignStat[RB_MAX_LEN]; 
+    
+    ISwitchVectorProperty OSOutput1SP;
+    ISwitch OSOutput1S[2];
+    ISwitchVectorProperty OSOutput2SP;
+    ISwitch OSOutput2S[2];
+    
+    char OSStat[RB_MAX_LEN];
+    char OldOSStat[RB_MAX_LEN];
 
-    char OSAlignStat[10];
-    char oldOSAlignStat[10];
-    bool OSAlignProcess=false;
-    bool OSAlignFlag=false;
-    bool OSAlignOn=false;
+//azwing align    char OSAlignStat[RB_MAX_LEN];
+//azwing align    char oldOSAlignStat[RB_MAX_LEN];
+//azwing align    bool OSAlignProcess=false;
+//azwing align    bool OSAlignFlag=false;
+//azwing align    bool OSAlignOn=false;
 
-    char OSPier[2];
-    char OldOSPier[2];
+    char OSPier[RB_MAX_LEN];
+    char OldOSPier[RB_MAX_LEN];
 
   private:
     int currentCatalog;
