@@ -472,18 +472,9 @@ int RoboFocus::updateRFBacklash(double *value)
         rf_cmd[3] = '0';
         rf_cmd[4] = '0';
 
-        if (*value > 99)
-        {
-            sprintf(vl_tmp, "%3d", (int)*value);
-        }
-        else if (*value > 9)
-        {
-            sprintf(vl_tmp, "0%2d", (int)*value);
-        }
-        else
-        {
-            sprintf(vl_tmp, "00%1d", (int)*value);
-        }
+        
+        sprintf(vl_tmp, "%03d", (int)*value);
+
         rf_cmd[5] = vl_tmp[0];
         rf_cmd[6] = vl_tmp[1];
         rf_cmd[7] = vl_tmp[2];
@@ -588,26 +579,8 @@ int RoboFocus::updateRFPositionRelativeInward(double value)
         return 0;
     }
 
-    if (value > 9999)
-    {
-        sprintf(rf_cmd, "FI0%5d", (int)value);
-    }
-    else if (value > 999)
-    {
-        sprintf(rf_cmd, "FI00%4d", (int)value);
-    }
-    else if (value > 99)
-    {
-        sprintf(rf_cmd, "FI000%3d", (int)value);
-    }
-    else if (value > 9)
-    {
-        sprintf(rf_cmd, "FI0000%2d", (int)value);
-    }
-    else
-    {
-        sprintf(rf_cmd, "FI00000%1d", (int)value);
-    }
+    sprintf(rf_cmd, "FI%06d", (int)value);
+    
 
     if ((robofocus_rc = SendCommand(rf_cmd)) < 0)
         return robofocus_rc;
@@ -632,26 +605,7 @@ int RoboFocus::updateRFPositionRelativeOutward(double value)
 
     rf_cmd[0] = 0;
 
-    if (value > 9999)
-    {
-        sprintf(rf_cmd, "FO0%5d", (int)value);
-    }
-    else if (value > 999)
-    {
-        sprintf(rf_cmd, "FO00%4d", (int)value);
-    }
-    else if (value > 99)
-    {
-        sprintf(rf_cmd, "FO000%3d", (int)value);
-    }
-    else if (value > 9)
-    {
-        sprintf(rf_cmd, "FO0000%2d", (int)value);
-    }
-    else
-    {
-        sprintf(rf_cmd, "FO00000%1d", (int)value);
-    }
+    sprintf(rf_cmd, "FO%06d", (int)value);
 
     if ((robofocus_rc = SendCommand(rf_cmd)) < 0)
         return robofocus_rc;
@@ -674,26 +628,7 @@ int RoboFocus::updateRFPositionAbsolute(double value)
 
     rf_cmd[0] = 0;
 
-    if (value > 9999)
-    {
-        sprintf(rf_cmd, "FG0%5d", (int)value);
-    }
-    else if (value > 999)
-    {
-        sprintf(rf_cmd, "FG00%4d", (int)value);
-    }
-    else if (value > 99)
-    {
-        sprintf(rf_cmd, "FG000%3d", (int)value);
-    }
-    else if (value > 9)
-    {
-        sprintf(rf_cmd, "FG0000%2d", (int)value);
-    }
-    else
-    {
-        sprintf(rf_cmd, "FG00000%1d", (int)value);
-    }
+    sprintf(rf_cmd, "FO%06d", (int)value);
 
     if ((robofocus_rc = SendCommand(rf_cmd)) < 0)
         return robofocus_rc;
@@ -796,26 +731,8 @@ int RoboFocus::updateRFMaxPosition(double *value)
         rf_cmd[1] = 'L';
         rf_cmd[2] = '0';
 
-        if (*value > 9999)
-        {
-            sprintf(vl_tmp, "%5d", (int)*value);
-        }
-        else if (*value > 999)
-        {
-            sprintf(vl_tmp, "0%4d", (int)*value);
-        }
-        else if (*value > 99)
-        {
-            sprintf(vl_tmp, "00%3d", (int)*value);
-        }
-        else if (*value > 9)
-        {
-            sprintf(vl_tmp, "000%2d", (int)*value);
-        }
-        else
-        {
-            sprintf(vl_tmp, "0000%1d", (int)*value);
-        }
+        sprintf(vl_tmp, "%05d", (int)*value);
+        
         rf_cmd[3] = vl_tmp[0];
         rf_cmd[4] = vl_tmp[1];
         rf_cmd[5] = vl_tmp[2];
@@ -907,26 +824,8 @@ bool RoboFocus::SyncFocuser(uint32_t ticks)
     rf_cmd[1] = 'S';
     rf_cmd[2] = '0';
 
-    if (ticks > 9999)
-    {
-        snprintf(vl_tmp, 6, "%5d", ticks);
-    }
-    else if (ticks > 999)
-    {
-        snprintf(vl_tmp, 6, "0%4d", ticks);
-    }
-    else if (ticks > 99)
-    {
-        snprintf(vl_tmp, 6, "00%3d", ticks);
-    }
-    else if (ticks > 9)
-    {
-        snprintf(vl_tmp, 6, "000%2d", ticks);
-    }
-    else
-    {
-        snprintf(vl_tmp, 6, "0000%1d", ticks);
-    }
+    snprintf(vl_tmp, 6, "%05d", ticks);
+    
     rf_cmd[3] = vl_tmp[0];
     rf_cmd[4] = vl_tmp[1];
     rf_cmd[5] = vl_tmp[2];
