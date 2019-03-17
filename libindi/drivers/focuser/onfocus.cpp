@@ -405,7 +405,7 @@ void OnFocus::GetFocusParams ()
 }
 
 
-IPState OnFocus::MoveAbsFocuser(uint32_t targetTicks)
+IPState OnFocus::MoveAbsFocuser(int32_t targetTicks)
 {
     uint32_t targetPos = targetTicks;
 

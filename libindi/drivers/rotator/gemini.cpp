@@ -1410,7 +1410,7 @@ bool Gemini::getRotatorStatus()
     memset(response, 0, sizeof(response));
     if (isSimulation())
     {
-        snprintf(response, 32, "TargStep = %06d\n", targetFocuserPosition);
+        snprintf(response, 32, "TargStep = %06u\n", targetFocuserPosition);
         nbytes_read = strlen(response);
     }
     else if ((errcode = tty_read_section(PortFD, response, 0xA, GEMINI_TIMEOUT, &nbytes_read)) != TTY_OK)
@@ -1461,7 +1461,7 @@ bool Gemini::getRotatorStatus()
     memset(response, 0, sizeof(response));
     if (isSimulation())
     {
-        snprintf(response, 32, "TargetPA = %06d\n", targetFocuserPosition);
+        snprintf(response, 32, "TargetPA = %06u\n", targetFocuserPosition);
         nbytes_read = strlen(response);
     }
     else if ((errcode = tty_read_section(PortFD, response, 0xA, GEMINI_TIMEOUT, &nbytes_read)) != TTY_OK)
@@ -2017,7 +2017,7 @@ bool Gemini::getFocusStatus()
     memset(response, 0, sizeof(response));
     if (isSimulation())
     {
-        snprintf(response, 32, "TargStep = %06d\n", targetFocuserPosition);
+        snprintf(response, 32, "TargStep = %06u\n", targetFocuserPosition);
         nbytes_read = strlen(response);
     }
     else if ((errcode = tty_read_section(PortFD, response, 0xA, GEMINI_TIMEOUT, &nbytes_read)) != TTY_OK)
@@ -2970,7 +2970,7 @@ IPState Gemini::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
 /************************************************************************************
 *
 * ***********************************************************************************/
-IPState Gemini::MoveAbsFocuser(uint32_t targetTicks)
+IPState Gemini::MoveAbsFocuser(int32_t targetTicks)
 {
     char cmd[32];
     int errcode = 0;

@@ -397,7 +397,7 @@ void FLIPDF::TimerHit()
     return;
 }
 
-IPState FLIPDF::MoveAbsFocuser(uint32_t targetTicks)
+IPState FLIPDF::MoveAbsFocuser(int32_t targetTicks)
 {
     int err = 0;
 

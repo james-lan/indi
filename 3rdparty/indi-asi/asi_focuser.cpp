@@ -460,7 +460,7 @@ void ASIEAF::GetFocusParams()
         IDSetSwitch(&BeepSP, nullptr);
 }
 
-IPState ASIEAF::MoveAbsFocuser(uint32_t targetTicks)
+IPState ASIEAF::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
 

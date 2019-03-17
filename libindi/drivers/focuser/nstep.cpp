@@ -443,7 +443,7 @@ bool NStep::getStartupValues()
     return (rc1 && rc2 && rc3);
 }
 
-IPState NStep::MoveAbsFocuser(uint32_t targetTicks)
+IPState NStep::MoveAbsFocuser(int32_t targetTicks)
 {
     m_TargetDiff = targetTicks - FocusAbsPosN[0].value;
     return IPS_BUSY;

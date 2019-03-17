@@ -128,6 +128,7 @@ bool lacerta_mfoc::initProperties()
     FocusMaxPosN[0].step = (FocusMaxPosN[0].max - FocusMaxPosN[0].min) / 20.0;
     FocusMaxPosN[0].value = 8000;
 
+    FocusAbsPosN[0].min = 0;
     FocusAbsPosN[0].max = FocusAbsPosN[0].value;
 
     IUFillSwitch(&TempTrackDirS[MODE_TDIR_BOTH], "Both", "Both", ISS_ON);
@@ -413,7 +414,7 @@ bool lacerta_mfoc::SetTempComp(double values[], char *names[], int n)
     return true;
 }
 
-bool lacerta_mfoc::SetFocuserMaxPosition(uint32_t ticks)
+bool lacerta_mfoc::SetFocuserMaxPosition(int32_t ticks)
 {
     char MFOC_cmd[32]  = ": G ";
     char MFOC_res[32]  = {0};
@@ -442,7 +443,7 @@ bool lacerta_mfoc::SetFocuserMaxPosition(uint32_t ticks)
 /************************************************************************************
  *
 ************************************************************************************/
-IPState lacerta_mfoc::MoveAbsFocuser(uint32_t targetTicks)
+IPState lacerta_mfoc::MoveAbsFocuser(int32_t targetTicks)
 {
     char MFOC_cmd[32]  = ": M ";
     char abs_pos_char[32]  = {0};

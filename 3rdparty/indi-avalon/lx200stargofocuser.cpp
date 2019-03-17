@@ -67,6 +67,9 @@ void LX200StarGoFocuser::initProperties(const char *groupName)
     IUFillNumber(&FocusSyncPosN[0], "FOCUS_SYNC_POSITION_VALUE", "Ticks", "%4.0f", 0.0, 100000.0, 1000.0, 0);
     IUFillNumberVector(&FocusSyncPosNP, FocusSyncPosN, 1, getDeviceName(), "FOCUS_SYNC_POSITION", "Sync", deviceName, IP_WO, 0, IPS_OK);
 
+    FocusAbsPosN[0].min = 0;
+    FocusAbsPosN[0].max = 100000;
+    
 }
 
 /**
@@ -352,7 +355,7 @@ IPState LX200StarGoFocuser::MoveFocuser(FocusDirection dir, int speed, uint16_t 
     return IPS_BUSY;
 }
 
-IPState LX200StarGoFocuser::MoveAbsFocuser(uint32_t absolutePosition) {
+IPState LX200StarGoFocuser::MoveAbsFocuser(int32_t absolutePosition) {
     bool result = sendMoveFocuserToPosition(absolutePosition);
     if (!result) {
         return IPS_ALERT;

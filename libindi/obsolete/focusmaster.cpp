@@ -281,7 +281,7 @@ IPState FocusMaster::MoveFocuser(FocusDirection dir, int speed, uint16_t duratio
     return IPS_BUSY;
 }
 
-IPState FocusMaster::MoveAbsFocuser(uint32_t targetTicks)
+IPState FocusMaster::MoveAbsFocuser(int32_t targetTicks)
 {
     INDI_UNUSED(targetTicks);
 

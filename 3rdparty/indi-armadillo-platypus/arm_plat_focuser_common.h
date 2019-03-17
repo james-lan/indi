@@ -39,7 +39,7 @@ class ArmPlat : public INDI::Focuser
 
 protected:
     virtual bool Connect() override;
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+    virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool AbortFocuser() override;
     virtual void TimerHit() override;

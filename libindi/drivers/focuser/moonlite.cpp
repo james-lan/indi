@@ -528,7 +528,7 @@ void MoonLite::timedMoveCallback()
     IDSetNumber(&FocusTimerNP, nullptr);
 }
 
-IPState MoonLite::MoveAbsFocuser(uint32_t targetTicks)
+IPState MoonLite::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
 

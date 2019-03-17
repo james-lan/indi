@@ -1425,10 +1425,10 @@ void RoboFocus::GetFocusParams()
 //    IDSetNumber(&MaxTravelNP, nullptr);
 }
 
-IPState RoboFocus::MoveAbsFocuser(uint32_t targetTicks)
+IPState RoboFocus::MoveAbsFocuser(int32_t targetTicks)
 {
     int ret   = -1;
-    targetPos = targetTicks;
+    double targetPos = targetTicks;
 
     if (targetTicks < FocusAbsPosN[0].min || targetTicks > FocusAbsPosN[0].max)
     {

@@ -193,7 +193,7 @@ class FocuserInterface
          * IPS_BUSY if focuser started motion to requested position and is in progress.
          * Return IPS_ALERT if there is an error.
          */
-        virtual IPState MoveAbsFocuser(uint32_t targetTicks);
+        virtual IPState MoveAbsFocuser(int32_t targetTicks);
 
         /**
          * \brief MoveFocuser the focuser to an relative position.

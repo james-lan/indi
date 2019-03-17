@@ -83,7 +83,7 @@ class TCFS : public INDI::Focuser
     virtual bool saveConfigItems(FILE *fp);
 
   protected:
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks);
+    virtual IPState MoveAbsFocuser(int32_t targetTicks);
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks);
     virtual void TimerHit();
     void GetFocusParams();

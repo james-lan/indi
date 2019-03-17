@@ -74,7 +74,7 @@ bool LX200_OnStep::initProperties()
     FocusRelPosN[0].max   = 30000.;
     FocusRelPosN[0].value = 0;
     FocusRelPosN[0].step  = 10;
-    FocusAbsPosN[0].min   = 0.;
+    FocusAbsPosN[0].min   = -60000.;
     FocusAbsPosN[0].max   = 60000.;
     FocusAbsPosN[0].value = 0;
     FocusAbsPosN[0].step  = 10;
@@ -1685,7 +1685,7 @@ IPState LX200_OnStep::MoveFocuser(FocusDirection dir, int speed, uint16_t durati
 	return IPS_BUSY; // Normal case, should be set to normal by update. 
 }
 
-IPState LX200_OnStep::MoveAbsFocuser (uint32_t targetTicks) {
+IPState LX200_OnStep::MoveAbsFocuser (int32_t targetTicks) {
 	//  :FSsnnn#  Set focuser target position (in microns)
 	//            Returns: Nothing
 	if (FocusAbsPosN[0].max >= targetTicks && FocusAbsPosN[0].min <= targetTicks) {
@@ -1703,7 +1703,7 @@ IPState LX200_OnStep::MoveAbsFocuser (uint32_t targetTicks) {
 IPState LX200_OnStep::MoveRelFocuser (FocusDirection dir, uint32_t ticks) {
 	//  :FRsnnn#  Set focuser target position relative (in microns)
 	//            Returns: Nothing
-	int output;
+	int32_t output;
 	char read_buffer[32];
 	output = ticks;
 	if (dir == FOCUS_INWARD) output = 0-ticks; 

@@ -184,7 +184,7 @@ bool FocuserInterface::processNumber(const char * dev, const char * name, double
     // Update Maximum Position allowed
     if (!strcmp(name, FocusMaxPosNP.name))
     {
-        uint32_t maxTravel = rint(values[0]);
+        int32_t maxTravel = rint(values[0]);
         if (SetFocuserMaxPosition(maxTravel))
         {
             IUUpdateNumber(&FocusMaxPosNP, values, names, n);
@@ -441,7 +441,7 @@ IPState FocuserInterface::MoveRelFocuser(FocusDirection dir, uint32_t ticks)
     return IPS_ALERT;
 }
 
-IPState FocuserInterface::MoveAbsFocuser(uint32_t ticks)
+IPState FocuserInterface::MoveAbsFocuser(int32_t ticks)
 {
     INDI_UNUSED(ticks);
     // Must be implemented by child class
@@ -480,7 +480,7 @@ bool FocuserInterface::SetFocuserSpeed(int speed)
     return false;
 }
 
-bool FocuserInterface::SetFocuserMaxPosition(uint32_t ticks)
+bool FocuserInterface::SetFocuserMaxPosition(int32_t ticks)
 {
     INDI_UNUSED(ticks);
     return true;

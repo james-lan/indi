@@ -904,7 +904,7 @@ void MoonLiteDRO::GetFocusParams()
         IDSetSwitch(&StepModeSP, nullptr);
 }
 
-IPState MoonLiteDRO::MoveAbsFocuser(uint32_t targetTicks)
+IPState MoonLiteDRO::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
 

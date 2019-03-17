@@ -37,9 +37,9 @@ class SestoSenso : public INDI::Focuser
         virtual bool Handshake() override;
         virtual bool Disconnect() override;
         virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
-        virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+        virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
 
-        virtual bool SetFocuserMaxPosition(uint32_t ticks) override;
+        virtual bool SetFocuserMaxPosition(int32_t ticks) override;
         virtual bool AbortFocuser() override;
         virtual void TimerHit() override;
 

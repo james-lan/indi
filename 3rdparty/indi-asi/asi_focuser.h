@@ -47,7 +47,7 @@ class ASIEAF : public INDI::Focuser
          * @param targetTicks target position
          * @return IPS_BUSY if motion is in progress. IPS_OK if motion is small and already complete. IPS_ALERT for trouble.
          */
-        virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+        virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
 
         /**
          * @brief MoveRelFocuser Move focuser for a relative amount of ticks in a specific direction

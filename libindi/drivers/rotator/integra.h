@@ -50,7 +50,7 @@ class Integra : public INDI::Focuser, public INDI::RotatorInterface
 
   protected:
     // Focuser
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks);
+    virtual IPState MoveAbsFocuser(int32_t targetTicks);
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks);
     virtual bool AbortFocuser();
 

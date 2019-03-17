@@ -45,7 +45,7 @@ class FLIPDF : public INDI::Focuser
     virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
 
   protected:
-    virtual IPState MoveAbsFocuser(uint32_t ticks) override;
+    virtual IPState MoveAbsFocuser(int32_t ticks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual void TimerHit() override;
 

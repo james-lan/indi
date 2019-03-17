@@ -92,7 +92,7 @@ class USBFocusV3 : public INDI::Focuser
     virtual bool updateProperties() override;
     virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
     virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+    virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool SetFocuserSpeed(int speed) override;
     virtual bool AbortFocuser() override;

@@ -1309,9 +1309,10 @@ IPState SteelDrive::MoveFocuser(FocusDirection dir, int speed, uint16_t duration
     return IPS_BUSY;
 }
 
-IPState SteelDrive::MoveAbsFocuser(uint32_t targetTicks)
+IPState SteelDrive::MoveAbsFocuser(int32_t targetTicks)
 {
-    targetPos = targetTicks;
+    //.min = 0 so the following is safe
+    uint32_t targetPos = targetTicks;
 
     bool rc = false;
 

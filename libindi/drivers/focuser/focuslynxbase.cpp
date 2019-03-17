@@ -199,6 +199,8 @@ bool FocusLynxBase::initProperties()
     IUFillNumberVector(&LedNP, LedN, 1, getDeviceName(), "LED", "Led", FOCUS_SETTINGS_TAB, IP_RW, 0, IPS_IDLE);
     //simPosition = FocusAbsPosN[0].value;
 
+    FocusAbsPosN[0].min  = 0;
+    
     addAuxControls();
 
     return true;
@@ -3077,7 +3079,7 @@ IPState FocusLynxBase::MoveFocuser(FocusDirection dir, int speed, uint16_t durat
 /************************************************************************************
 *
 * ***********************************************************************************/
-IPState FocusLynxBase::MoveAbsFocuser(uint32_t targetTicks)
+IPState FocusLynxBase::MoveAbsFocuser(int32_t targetTicks)
 {
     char cmd[LYNX_MAX] = {0};
     int errcode = 0;

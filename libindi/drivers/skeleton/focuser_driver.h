@@ -49,7 +49,7 @@ class FocuserDriver : public INDI::Focuser
         void TimerHit() override;
 
         IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
-        IPState MoveAbsFocuser(uint32_t targetTicks) override;
+        IPState MoveAbsFocuser(int32_t targetTicks) override;
         bool SyncFocuser(uint32_t ticks) override;
         bool AbortFocuser() override;
 

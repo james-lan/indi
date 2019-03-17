@@ -54,7 +54,7 @@ class PegasusUPB : public INDI::DefaultDevice, public INDI::FocuserInterface, pu
     virtual void TimerHit() override;
 
     // Focuser Overrides
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+    virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool AbortFocuser() override;
     virtual bool ReverseFocuser(bool enabled) override;

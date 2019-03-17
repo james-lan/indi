@@ -337,9 +337,14 @@ bool SestoSenso::sync(uint32_t newPosition)
     return !strcmp(res, "SPok!");
 }
 
-bool SestoSenso::SetFocuserMaxPosition(uint32_t ticks)
+bool SestoSenso::SetFocuserMaxPosition(int32_t ticks)
 {
-    return setMaxLimit(ticks);
+    if (ticks > 0) {
+        return setMaxLimit((uint32_t) ticks);
+    } else {
+        return false;
+    }
+    
 }
 
 bool SestoSenso::setMaxLimit(uint32_t limit)
@@ -449,9 +454,9 @@ bool SestoSenso::ISNewNumber(const char *dev, const char *name, double values[],
     return INDI::Focuser::ISNewNumber(dev, name, values, names, n);
 }
 
-IPState SestoSenso::MoveAbsFocuser(uint32_t targetTicks)
+IPState SestoSenso::MoveAbsFocuser(int32_t targetTicks)
 {
-    targetPos = targetTicks;
+    targetPos = targetTicks; 
 
     char cmd[SESTO_LEN] = {0};
     snprintf(cmd, 16, "#GT%d!", targetTicks);

@@ -780,7 +780,7 @@ bool DMFC::setMotorType(uint8_t type)
     return true;
 }
 
-IPState DMFC::MoveAbsFocuser(uint32_t targetTicks)
+IPState DMFC::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPosition = targetTicks;
 

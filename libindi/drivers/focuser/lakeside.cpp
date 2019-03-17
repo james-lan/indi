@@ -2218,7 +2218,7 @@ IPState Lakeside::MoveRelFocuser(FocusDirection dir, uint32_t ticks)
 //
 // Main Lakeside Absolute movement routine
 //
-IPState Lakeside::MoveAbsFocuser(uint32_t targetTicks)
+IPState Lakeside::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
     bool rc = false;

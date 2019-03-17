@@ -94,7 +94,7 @@ class Focuser : public DefaultDevice, public FocuserInterface
      * @param ticks maximum ticks
      * @return True
      */
-    virtual bool SetFocuserMaxPosition(uint32_t ticks);
+    virtual bool SetFocuserMaxPosition(int32_t ticks);
 
     /**
      * @brief syncPresets Updates the min/max/step range of the preset as per the maximum name of Absolute Focus Travel

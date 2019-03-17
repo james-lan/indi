@@ -42,7 +42,7 @@ public:
 protected:
 
     virtual bool Handshake() override;
-    virtual IPState MoveAbsFocuser(uint32_t ticks) override;
+    virtual IPState MoveAbsFocuser(int32_t ticks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool AbortFocuser() override;
     virtual void TimerHit() override;

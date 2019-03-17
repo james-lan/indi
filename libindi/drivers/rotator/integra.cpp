@@ -480,10 +480,10 @@ bool Integra::ISNewNumber (const char * dev, const char * name, double values[],
     return INDI::Focuser::ISNewNumber(dev, name, values, names, n);
 }
 
-IPState Integra::MoveAbsFocuser(uint32_t targetTicks)
+IPState Integra::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPosition = targetTicks;
-    LOGF_DEBUG("Focuser will move absolute from %d to %d ...", lastFocuserPosition, targetTicks);
+    LOGF_DEBUG("Focuser will move absolute from %u to %d ...", lastFocuserPosition, targetTicks);
 
     bool rc = false;
     rc = gotoMotor(MOTOR_FOCUS, targetPosition);
@@ -581,9 +581,9 @@ void Integra::TimerHit()
                     IDSetNumber(&FocusAbsPosNP, nullptr);
                     IDSetNumber(&FocusRelPosNP, nullptr);
                     if (haveReadFocusPositionAtLeastOnce) {
-                        LOGF_INFO("Focuser reached requested position %d", lastFocuserPosition);
+                        LOGF_INFO("Focuser reached requested position %u", lastFocuserPosition);
                     } else {
-                        LOGF_INFO("Focuser position is %d", lastFocuserPosition);
+                        LOGF_INFO("Focuser position is %u", lastFocuserPosition);
                         haveReadFocusPositionAtLeastOnce = true;
                     }
                     savePositionsToEEPROM = true;

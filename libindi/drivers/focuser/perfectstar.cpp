@@ -138,6 +138,10 @@ bool PerfectStar::initProperties()
 //    FocusRelPosN[0].step  = FocusRelPosN[0].max / 100.0;
 //    FocusRelPosN[0].value = 100;
 
+    FocusAbsPosN[0].min = 0;
+    FocusAbsPosN[0].max = 1048575; //20-bit value
+    
+    
     addSimulationControl();
 
     return true;
@@ -272,7 +276,7 @@ bool PerfectStar::ISNewNumber(const char *dev, const char *name, double values[]
     return INDI::Focuser::ISNewNumber(dev, name, values, names, n);
 }
 
-IPState PerfectStar::MoveAbsFocuser(uint32_t targetTicks)
+IPState PerfectStar::MoveAbsFocuser(int32_t targetTicks)
 {
     bool rc = setPosition(targetTicks);
 
@@ -310,7 +314,7 @@ bool PerfectStar::setPosition(uint32_t ticks)
     command[0] = 0x28;
     command[1] = (ticks & 0x40000) >> 16;
 
-    LOGF_DEBUG("Set Position (%ld)", ticks);
+    LOGF_DEBUG("Set Position (%lu)", ticks);
     LOGF_DEBUG("CMD (%02X %02X)", command[0], command[1]);
 
     if (sim)
@@ -471,7 +475,7 @@ bool PerfectStar::getPosition(uint32_t *ticks)
 
     *ticks = pos;
 
-    LOGF_DEBUG("Position: %ld", pos);
+    LOGF_DEBUG("Position: %lu", pos);
 
     return true;
 }

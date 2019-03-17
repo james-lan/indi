@@ -144,6 +144,8 @@ bool FocusSim::initProperties()
     FocusSpeedN[0].step  = 1;
     FocusSpeedN[0].value = 1;
 
+    FocusAbsPosN[0].min  = -10000;
+    FocusAbsPosN[0].max  = 100000;
     FocusAbsPosN[0].value = FocusAbsPosN[0].max / 2;
 
     internalTicks = FocusAbsPosN[0].value;
@@ -289,7 +291,7 @@ IPState FocusSim::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
 /************************************************************************************
  *
 ************************************************************************************/
-IPState FocusSim::MoveAbsFocuser(uint32_t targetTicks)
+IPState FocusSim::MoveAbsFocuser(int32_t targetTicks)
 {
     double mid = (FocusAbsPosN[0].max - FocusAbsPosN[0].min) / 2;
 

@@ -61,7 +61,7 @@ protected:
 
     bool SetFocuserSpeed(int speed) override;
     IPState MoveFocuser(FocusDirection dir, int speed, uint16_t duration) override;
-    IPState MoveAbsFocuser(uint32_t absolutePosition) override;
+    IPState MoveAbsFocuser(int32_t absolutePosition) override;
     IPState moveFocuserRelative(int relativePosition);
     bool AbortFocuser() override;
     IPState syncFocuser(int absolutePosition);

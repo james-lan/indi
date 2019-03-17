@@ -44,7 +44,7 @@ class PerfectStar : public INDI::Focuser
 
     virtual void TimerHit() override;
 
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+    virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool AbortFocuser() override;
     virtual bool SyncFocuser(uint32_t ticks) override;

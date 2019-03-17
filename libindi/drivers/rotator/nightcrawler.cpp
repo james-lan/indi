@@ -649,7 +649,7 @@ bool NightCrawler::ISNewNumber (const char * dev, const char * name, double valu
     return INDI::Focuser::ISNewNumber(dev, name, values, names, n);
 }
 
-IPState NightCrawler::MoveAbsFocuser(uint32_t targetTicks)
+IPState NightCrawler::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPosition = targetTicks;
 

@@ -629,7 +629,7 @@ bool ArmPlat::setBacklash(uint16_t value)
     return true;
 }
 
-IPState ArmPlat::MoveAbsFocuser(uint32_t targetTicks)
+IPState ArmPlat::MoveAbsFocuser(int32_t targetTicks)
 {
     if ( port == -1 )
         return IPS_ALERT;

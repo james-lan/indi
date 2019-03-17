@@ -98,6 +98,7 @@ bool TCFS::initProperties()
     {
         isTCFS3 = true;
 
+        FocusAbsPosN[0].min  = 0;
         FocusAbsPosN[0].max  = 9999;
         FocusRelPosN[0].max  = 2000;
         FocusRelPosN[0].step = FocusAbsPosN[0].step = 100;
@@ -108,6 +109,7 @@ bool TCFS::initProperties()
     {
         isTCFS3 = false;
 
+        FocusAbsPosN[0].min  = 0;
         FocusAbsPosN[0].max  = 7000;
         FocusRelPosN[0].max  = 2000;
         FocusRelPosN[0].step = FocusAbsPosN[0].step = 100;
@@ -774,7 +776,7 @@ LOGF_DEBUG("%s %s %s %s",__FUNCTION__, me, dev, name);
     return INDI::Focuser::ISNewSwitch(dev, name, states, names, n);
 }
 
-IPState TCFS::MoveAbsFocuser(uint32_t targetTicks)
+IPState TCFS::MoveAbsFocuser(int32_t targetTicks)
 {
     int delta = targetTicks - currentPosition;
 
@@ -876,14 +878,14 @@ bool TCFS::dispatch_command(TCFSCommand command_type, int val, TCFSMode m)
         case FIN:
             simulated_position = currentPosition;
 
-            snprintf(command, TCFS_MAX_CMD, "FI%04d", targetTicks);
+            snprintf(command, TCFS_MAX_CMD, "FI%04u", targetTicks);
             break;
 
         // Focuser Out “nnnn”
         case FOUT:
             simulated_position = currentPosition;
 
-            snprintf(command, TCFS_MAX_CMD, "FO%04d", targetTicks);
+            snprintf(command, TCFS_MAX_CMD, "FO%04u", targetTicks);
             break;
 
         // Focuser Position Read Out
@@ -1129,7 +1131,7 @@ void TCFS::TimerHit()
 
             if (strcmp(response, "*") == 0)
             {
-                LOGF_DEBUG("Moving focuser %d steps to position %d.", targetTicks, targetPosition);
+                LOGF_DEBUG("Moving focuser %u steps to position %u.", targetTicks, targetPosition);
                 FocusAbsPosNP.s = IPS_OK;
                 FocusRelPosNP.s = IPS_OK;
                 FocusGotoSP.s  = IPS_OK;

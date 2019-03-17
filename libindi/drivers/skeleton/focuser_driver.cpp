@@ -270,7 +270,7 @@ bool FocuserDriver::getStartupValues()
     return rc1;
 }
 
-IPState FocuserDriver::MoveAbsFocuser(uint32_t targetTicks)
+IPState FocuserDriver::MoveAbsFocuser(int32_t targetTicks)
 {
     // Issue here the command necessary to move the focuser to targetTicks
     return IPS_BUSY;

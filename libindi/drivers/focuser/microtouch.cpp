@@ -348,11 +348,11 @@ bool Microtouch::SyncFocuser(uint32_t ticks)
 
 bool Microtouch::MoveFocuser(unsigned int position)
 {
-    LOGF_DEBUG("MoveFocuser to Position: %d", position);
+    LOGF_DEBUG("MoveFocuser to Position: %u", position);
 
     if (position < FocusAbsPosN[0].min || position > FocusAbsPosN[0].max)
     {
-        LOGF_ERROR("Requested position value out of bound: %d", position);
+        LOGF_ERROR("Requested position value out of bound: %u", position);
         return false;
     }
     return WriteCmdSetIntAsDigits(CMD_UPDATE_POSITION, position);
@@ -590,7 +590,7 @@ IPState Microtouch::MoveFocuser(FocusDirection dir, int speed, uint16_t duration
     return IPS_BUSY;
 }
 
-IPState Microtouch::MoveAbsFocuser(uint32_t targetTicks)
+IPState Microtouch::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
 

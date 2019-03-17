@@ -490,7 +490,7 @@ bool DeepSkyDadAF1::MoveFocuser(uint32_t position)
 {
     char cmd[DSD_RES] = {0};
     char res[DSD_RES] = {0};
-    snprintf(cmd, DSD_RES, "[STRG%06d]", position);
+    snprintf(cmd, DSD_RES, "[STRG%06u]", position);
     // Set Position First
     if (sendCommand(cmd, res) == false)
         return false;
@@ -846,7 +846,7 @@ void DeepSkyDadAF1::timedMoveCallback()
 }
 
 
-IPState DeepSkyDadAF1::MoveAbsFocuser(uint32_t targetTicks)
+IPState DeepSkyDadAF1::MoveAbsFocuser(int32_t targetTicks)
 {
     targetPos = targetTicks;
 

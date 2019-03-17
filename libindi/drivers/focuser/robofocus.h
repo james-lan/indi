@@ -37,7 +37,7 @@ class RoboFocus : public INDI::Focuser
     const char *getDefaultName() override;
     virtual bool initProperties() override;
     virtual bool updateProperties() override;
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks) override;
+    virtual IPState MoveAbsFocuser(sint32_t targetTicks) override;
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks) override;
     virtual bool AbortFocuser() override;
     virtual void TimerHit() override;

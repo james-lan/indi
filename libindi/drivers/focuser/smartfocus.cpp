@@ -205,7 +205,7 @@ bool SmartFocus::AbortFocuser()
     return result;
 }
 
-IPState SmartFocus::MoveAbsFocuser(uint32_t targetPosition)
+IPState SmartFocus::MoveAbsFocuser(int32_t targetPosition)
 {
     const Position destination = static_cast<Position>(targetPosition);
     IPState result             = IPS_ALERT;

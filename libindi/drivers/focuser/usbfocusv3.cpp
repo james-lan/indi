@@ -1088,7 +1088,7 @@ bool USBFocusV3::SetFocuserSpeed(int speed)
     return true;
 }
 
-IPState USBFocusV3::MoveAbsFocuser(uint32_t targetTicks)
+IPState USBFocusV3::MoveAbsFocuser(int32_t targetTicks)
 {
     long ticks;
 

@@ -357,7 +357,7 @@ void Focuser::setSupportedConnections(const uint8_t &value)
     focuserConnection = value;
 }
 
-bool Focuser::SetFocuserMaxPosition(uint32_t ticks)
+bool Focuser::SetFocuserMaxPosition(int32_t ticks)
 {
     SyncPresets(ticks);
     return true;

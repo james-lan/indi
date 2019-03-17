@@ -36,7 +36,7 @@ class DMFC : public INDI::Focuser
     virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n);
 
 protected:
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks);
+    virtual IPState MoveAbsFocuser(int32_t targetTicks);
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks);
     virtual bool AbortFocuser();
     virtual void TimerHit();

@@ -43,7 +43,7 @@ class FocusMaster : public INDI::Focuser
     void TimerHit();
 
     virtual IPState MoveFocuser(FocusDirection dir, int speed, uint16_t duration);
-    virtual IPState MoveAbsFocuser(uint32_t targetTicks);
+    virtual IPState MoveAbsFocuser(int32_t targetTicks);
     virtual IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks);
 
     virtual bool AbortFocuser();

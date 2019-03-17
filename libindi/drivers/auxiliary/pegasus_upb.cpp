@@ -234,6 +234,9 @@ bool PegasusUPB::initProperties()
     IUFillSwitch(&FocuserBacklashS[BACKLASH_DISABLED], "BACKLASH_DISABLED", "Disabled", ISS_ON);
     IUFillSwitchVector(&FocuserBacklashSP, FocuserBacklashS, 2, getDeviceName(), "FOCUSER_BACKLASH", "Backlash", FOCUS_TAB, IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
 
+    FocusAbsPosN[0].min = 0.;
+    FocusAbsPosN[0].max = 1000000.;
+    
     // Temperature
     IUFillNumber(&FocuserTemperatureN[0], "FOCUS_TEMPERATURE_VALUE", "Value (C)", "%4.2f", -50, 85, 1, 0);
     IUFillNumberVector(&FocuserTemperatureNP, FocuserTemperatureN, 1, getDeviceName(), "FOCUS_TEMPERATURE", "Temperature", FOCUS_TAB, IP_RO, 60, IPS_IDLE);
@@ -658,7 +661,7 @@ bool PegasusUPB::sendCommand(const char * cmd, char * res)
     return false;
 }
 
-IPState PegasusUPB::MoveAbsFocuser(uint32_t targetTicks)
+IPState PegasusUPB::MoveAbsFocuser(int32_t targetTicks)
 {
     char cmd[PEGASUS_LEN] = {0}, res[PEGASUS_LEN] = {0}, expected[PEGASUS_LEN] = {0};
     snprintf(cmd, PEGASUS_LEN, "SM:%d", targetTicks);
