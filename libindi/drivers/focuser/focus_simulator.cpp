@@ -24,7 +24,7 @@
 #include <unistd.h>
 
 // We declare an auto pointer to focusSim.
-std::unique_ptr<FocusSim> focusSim(new FocusSim());
+static std::unique_ptr<FocusSim> focusSim(new FocusSim());
 
 // Focuser takes 100 microsecond to move for each step, completing 100,000 steps in 10 seconds
 #define FOCUS_MOTION_DELAY 100
@@ -99,7 +99,7 @@ bool FocusSim::Disconnect()
 ************************************************************************************/
 const char *FocusSim::getDefaultName()
 {
-    return (const char *)"Focuser Simulator";
+    return "Focuser Simulator";
 }
 
 /************************************************************************************
@@ -272,7 +272,7 @@ IPState FocusSim::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
     FWHMN[0].value = 0.5625 * ticks * ticks + SeeingN[0].value;
 
     LOGF_DEBUG("TIMER Current internal ticks: %g FWHM ticks: %g FWHM: %g", internalTicks, ticks,
-           FWHMN[0].value);
+               FWHMN[0].value);
 
     if (mode == MODE_ALL)
     {
@@ -308,7 +308,7 @@ IPState FocusSim::MoveAbsFocuser(int32_t targetTicks)
     FWHMN[0].value = 0.5625 * ticks * ticks + SeeingN[0].value;
 
     LOGF_DEBUG("ABS Current internal ticks: %g FWHM ticks: %g FWHM: %g", internalTicks, ticks,
-           FWHMN[0].value);
+               FWHMN[0].value);
 
     if (FWHMN[0].value < SeeingN[0].value)
         FWHMN[0].value = SeeingN[0].value;
@@ -341,7 +341,7 @@ IPState FocusSim::MoveRelFocuser(FocusDirection dir, uint32_t ticks)
     ticks = initTicks + (internalTicks - mid) / 5000.0;
 
     LOGF_DEBUG("REL Current internal ticks: %g FWHM ticks: %g FWHM: %g", internalTicks, ticks,
-           FWHMN[0].value);
+               FWHMN[0].value);
 
     FWHMN[0].value = 0.5625 * ticks * ticks + SeeingN[0].value;
 

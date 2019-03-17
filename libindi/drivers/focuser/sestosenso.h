@@ -33,6 +33,8 @@ class SestoSenso : public INDI::Focuser
         virtual bool updateProperties() override;
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
 
+        static void checkMotionProgressHelper(void *context);
+
     protected:
         virtual bool Handshake() override;
         virtual bool Disconnect() override;
@@ -40,6 +42,9 @@ class SestoSenso : public INDI::Focuser
         virtual IPState MoveAbsFocuser(int32_t targetTicks) override;
 
         virtual bool SetFocuserMaxPosition(int32_t ticks) override;
+        virtual bool SetFocuserMaxPosition(uint32_t ticks) override;
+        virtual bool SyncFocuser(uint32_t ticks) override;
+        virtual bool ReverseFocuser(bool enabled) override;
         virtual bool AbortFocuser() override;
         virtual void TimerHit() override;
 
@@ -49,9 +54,10 @@ class SestoSenso : public INDI::Focuser
         bool setMaxLimit(uint32_t limit);
         bool updateMaxLimit();
 
-        bool sync(uint32_t newPosition);
         bool updateTemperature();
         bool updatePosition();
+
+        void checkMotionProgressCallback();
 
         ///////////////////////////////////////////////////////////////////////////////
         /// Utility Functions
@@ -72,9 +78,6 @@ class SestoSenso : public INDI::Focuser
         IText FirmwareT[1] {};
         ITextVectorProperty FirmwareTP;
 
-        INumber SyncN[1];
-        INumberVectorProperty SyncNP;
-
         INumber LimitsN[2];
         INumberVectorProperty LimitsNP;
         enum
@@ -83,6 +86,7 @@ class SestoSenso : public INDI::Focuser
             SS_MAX_LIMIT
         };
 
+        int m_MotionProgressTimerID = -1;
         /////////////////////////////////////////////////////////////////////////////
         /// Static Helper Values
         /////////////////////////////////////////////////////////////////////////////
