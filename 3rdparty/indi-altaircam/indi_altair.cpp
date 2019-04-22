@@ -334,6 +334,11 @@ bool ALTAIRCAM::initProperties()
     IUFillSwitchVector(&FanControlSP, FanControlS, 2, getDeviceName(), "TC_FAN_CONTROL", "Fan", MAIN_CONTROL_TAB, IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
 
     ///////////////////////////////////////////////////////////////////////////////////
+    /// Fan Speed
+    ///////////////////////////////////////////////////////////////////////////////////
+    IUFillSwitchVector(&FanSpeedSP, FanSpeedS, 0, getDeviceName(), "TC_FAN_Speed", "Fan Speed", MAIN_CONTROL_TAB, IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
+
+    ///////////////////////////////////////////////////////////////////////////////////
     /// Video Format
     ///////////////////////////////////////////////////////////////////////////////////
     /// RGB Mode but 8 bits grayscale
@@ -393,7 +398,10 @@ bool ALTAIRCAM::updateProperties()
         }
 
         if (m_Instance->model->flag & ALTAIRCAM_FLAG_FAN)
+        {
             defineSwitch(&FanControlSP);
+            defineSwitch(&FanSpeedSP);
+        }
 
         if (m_MonoCamera == false)
             defineSwitch(&WBAutoSP);
@@ -425,7 +433,10 @@ bool ALTAIRCAM::updateProperties()
             deleteProperty(TemperatureNP.name);
 
         if (m_Instance->model->flag & ALTAIRCAM_FLAG_FAN)
+        {
             deleteProperty(FanControlSP.name);
+            deleteProperty(FanSpeedSP.name);
+        }
 
         if (m_MonoCamera == false)
             deleteProperty(WBAutoSP.name);
@@ -685,6 +696,22 @@ void ALTAIRCAM::setupParams()
         FanControlS[TC_FAN_ON].s = fan == 0 ? ISS_OFF : ISS_ON;
         FanControlS[TC_FAN_OFF].s = fan == 0 ? ISS_ON : ISS_OFF;
         FanControlSP.s = (fan == 0) ? IPS_IDLE : IPS_BUSY;
+
+        // Fan Speed
+        delete [] FanSpeedS;
+        // If Fan is OFF, then set the default one to 1x
+        uint32_t activeFan = (fan == 0) ? 1 : fan;
+        FanSpeedS = new ISwitch[m_Instance->model->maxfanspeed];
+        for (uint32_t i = 0; i < m_Instance->model->maxfanspeed; i++)
+        {
+            char name[MAXINDINAME] = {0}, label[MAXINDINAME] = {0};
+            snprintf(name, MAXINDINAME, "FAN_SPEED_%d", i + 1);
+            snprintf(label, MAXINDINAME, "%dx", i + 1);
+            IUFillSwitch(FanSpeedS + i, name, label, (activeFan == i + 1) ? ISS_ON : ISS_OFF);
+        }
+        FanSpeedSP.sp = FanSpeedS;
+        FanSpeedSP.nsp = m_Instance->model->maxfanspeed;
+        FanSpeedSP.s = IPS_OK;
     }
 
     // Get active resolution index
@@ -757,6 +784,7 @@ void ALTAIRCAM::setupParams()
     // JM 2019-01-17: Always set it to 0 on ARM due to USB limitations
 #ifdef __arm__
     ControlN[TC_SPEED].value = 0;
+    Altaircam_put_Speed(m_CameraHandle, 0);
 #else
     ControlN[TC_SPEED].value = nDef;
 #endif
@@ -1083,13 +1111,25 @@ bool ALTAIRCAM::ISNewSwitch(const char *dev, const char *name, ISState *states, 
         }
 
         //////////////////////////////////////////////////////////////////////
+        /// Fan Speed
+        //////////////////////////////////////////////////////////////////////
+        if (!strcmp(name, FanSpeedSP.name))
+        {
+            IUUpdateSwitch(&FanSpeedSP, states, names, n);
+            FanSpeedSP.s = IPS_OK;
+            IDSetSwitch(&FanSpeedSP, nullptr);
+            return true;
+        }
+
+        //////////////////////////////////////////////////////////////////////
         /// Fan Control
         //////////////////////////////////////////////////////////////////////
         if (!strcmp(name, FanControlSP.name))
         {
             int prevIndex = IUFindOnSwitchIndex(&FanControlSP);
             IUUpdateSwitch(&FanControlSP, states, names, n);
-            HRESULT rc = Altaircam_put_Option(m_CameraHandle, ALTAIRCAM_OPTION_FAN, FanControlS[0].s == ISS_ON ? 1 : 0 );
+            HRESULT rc = Altaircam_put_Option(m_CameraHandle, ALTAIRCAM_OPTION_FAN,
+                                              FanControlS[0].s == ISS_ON ? IUFindOnSwitchIndex(&FanSpeedSP) + 1 : 0 );
             if (rc != 0)
             {
                 LOGF_ERROR("Failed to turn the fan %s. Error (%s)", FanControlS[0].s == ISS_ON ? "on" : "off", errorCodes[rc].c_str());
@@ -1562,11 +1602,11 @@ bool ALTAIRCAM::StartExposure(float duration)
         m_CurrentTriggerMode = TRIGGER_SOFTWARE;
     }
 
-    int timeMS = uSecs / 1000 - 50;
-    if (timeMS <= 0)
-        sendImageCallBack();
-    else if (static_cast<uint32_t>(timeMS) < POLLMS)
-        IEAddTimer(timeMS, &ALTAIRCAM::sendImageCB, this);
+    //    int timeMS = uSecs / 1000 - 50;
+    //    if (timeMS <= 0)
+    //        sendImageCallBack();
+    //    else if (static_cast<uint32_t>(timeMS) < POLLMS)
+    //        IEAddTimer(timeMS, &ALTAIRCAM::sendImageCB, this);
 
     // Trigger an exposure
     if ( (rc = Altaircam_Trigger(m_CameraHandle, 1) != 0) )
@@ -1660,22 +1700,9 @@ void ALTAIRCAM::TimerHit()
         gettimeofday(&curtime, nullptr);
         timersub(&ExposureEnd, &curtime, &diff);
         double timeleft = diff.tv_sec + diff.tv_usec / 1e6;
-        uint32_t msecs = 0;
-        if (timeleft <= 0)
-            msecs = 0;
-        else
-            msecs = timeleft * 1000.0;
-        // If within 50ms, let's set it done
-        if (msecs <= 50)
-            sendImageCallBack();
-        // If time left is less than our polling then let's send image before next poll event
-        else
-        {
-            if (msecs < POLLMS)
-                IEAddTimer(msecs - 50, &ALTAIRCAM::sendImageCB, this);
-
-            PrimaryCCD.setExposureLeft(timeleft);
-        }
+        if (timeleft < 0)
+            timeleft = 0;
+        PrimaryCCD.setExposureLeft(timeleft);
     }
 
     if (m_Instance->model->flag & ALTAIRCAM_FLAG_GETTEMPERATURE)
@@ -1893,139 +1920,6 @@ void ALTAIRCAM::refreshControls()
     IDSetNumber(&ControlNP, nullptr);
 }
 
-#if 0
-void *ALTAIRCAM::imagingHelper(void *context)
-{
-    return static_cast<ALTAIRCAM *>(context)->imagingThreadEntry();
-}
-
-/*
- * A dedicated thread is used for handling streaming video and image
- * exposures because the operations take too much time to be done
- * as part of a timer call-back: there is one timer for the entire
- * process, which must handle events for all ASI cameras
- */
-void *ALTAIRCAM::imagingThreadEntry()
-{
-    pthread_mutex_lock(&condMutex);
-    threadState = StateIdle;
-    pthread_cond_signal(&cv);
-    while (true)
-    {
-        while (threadRequest == StateIdle)
-        {
-            pthread_cond_wait(&cv, &condMutex);
-        }
-        threadState = threadRequest;
-        if (threadRequest == StateExposure)
-        {
-            getSnapImage();
-        }
-        else if (threadRequest == StateStream)
-        {
-            getVideoImage();
-        }
-        else if (threadRequest == StateRestartExposure)
-        {
-            threadRequest = StateIdle;
-            pthread_mutex_unlock(&condMutex);
-            StartExposure(ExposureRequest);
-            pthread_mutex_lock(&condMutex);
-        }
-        else if (threadRequest == StateTerminate)
-        {
-            break;
-        }
-        else
-        {
-            threadRequest = StateIdle;
-            pthread_cond_signal(&cv);
-        }
-        threadState = StateIdle;
-    }
-    threadState = StateTerminated;
-    pthread_cond_signal(&cv);
-    pthread_mutex_unlock(&condMutex);
-
-    return nullptr;
-}
-
-void ALTAIRCAM::getVideoImage()
-{
-#if 0
-    int ret;
-    int frames = 0;
-
-    while (threadRequest == StateStream)
-    {
-        pthread_mutex_unlock(&condMutex);
-
-        uint8_t *targetFrame = PrimaryCCD.getFrameBuffer();
-        uint32_t totalBytes  = PrimaryCCD.getFrameBufferSize();
-        int waitMS           = (int)(ExposureRequest * 2000.0) + 500;
-
-        ret = ASIGetVideoData(m_camInfo->CameraID, targetFrame, totalBytes,
-                              waitMS);
-        if (ret != 0)
-        {
-            if (ret != ASI_ERROR_TIMEOUT)
-            {
-                Streamer->setStream(false);
-                pthread_mutex_lock(&condMutex);
-                if (threadRequest == StateStream)
-                {
-                    LOGF_ERROR(
-                        "Error reading video data (%d)", ret);
-                    threadRequest = StateIdle;
-                }
-                break;
-            }
-            else
-            {
-                frames = 0;
-                usleep(100);
-            }
-        }
-        else
-        {
-            if (currentVideoFormat == ASI_IMG_RGB24)
-            {
-                for (uint32_t i = 0; i < totalBytes; i += 3)
-                {
-                    uint8_t r = targetFrame[i];
-                    targetFrame[i] = targetFrame[i + 2];
-                    targetFrame[i + 2] = r;
-                }
-            }
-
-            Streamer->newFrame(targetFrame, totalBytes);
-
-            /*
-             * Release the CPU every 30 frames
-             */
-            frames++;
-            if (frames == 30)
-            {
-                frames = 0;
-                usleep(10);
-            }
-        }
-
-        pthread_mutex_lock(&condMutex);
-    }
-#endif
-}
-
-/* Caller must hold the mutex */
-void ALTAIRCAM::exposureSetRequest(ImageState request)
-{
-    if (threadRequest == StateExposure)
-    {
-        threadRequest = request;
-    }
-}
-#endif
-
 void ALTAIRCAM::addFITSKeywords(fitsfile *fptr, INDI::CCDChip *targetChip)
 {
     INDI::CCD::addFITSKeywords(fptr, targetChip);
@@ -2101,56 +1995,16 @@ void ALTAIRCAM::AutoExposureChanged()
     // TODO
 }
 
-void ALTAIRCAM::sendImageCB(void* pCtx)
-{
-    static_cast<ALTAIRCAM*>(pCtx)->sendImageCallBack();
-}
-
 void ALTAIRCAM::eventCB(unsigned event, void* pCtx)
 {
     static_cast<ALTAIRCAM*>(pCtx)->eventPullCallBack(event);
-}
-
-void ALTAIRCAM::sendImageCallBack()
-{
-    PrimaryCCD.setExposureLeft(0);
-    InExposure = false;
-    m_lastEventID = -1;
-
-    //    RemoveTimer(m_TimeoutTimerID);
-    //    m_TimeoutTimerID = IEAddTimer(POLLMS+50, &ALTAIRCAM::checkTimeoutHelper, this);
-}
-
-void ALTAIRCAM::checkTimeoutHelper(void *context)
-{
-    static_cast<ALTAIRCAM*>(context)->checkCameraCallback();
-}
-
-void ALTAIRCAM::checkCameraCallback()
-{
-    if (m_lastEventID != 4)
-    {
-        LOG_DEBUG("Exposure timeout, restarting...");
-        if (m_TimeoutRetries++ >= MAX_RETRIES)
-        {
-            PrimaryCCD.setExposureFailed();
-            m_TimeoutRetries = 0;
-            LOG_ERROR("Exposure timeout.");
-        }
-        else
-            StartExposure(PrimaryCCD.getExposureDuration());
-    }
-    else
-    {
-        m_TimeoutRetries = 0;
-    }
 }
 
 void ALTAIRCAM::eventPullCallBack(unsigned event)
 {
     LOGF_DEBUG("Event %#04X", event);
 
-    m_lastEventID = event;
+    //m_lastEventID = event;
 
     switch (event)
     {
@@ -2164,11 +2018,6 @@ void ALTAIRCAM::eventPullCallBack(unsigned event)
             AltaircamFrameInfoV2 info;
             memset(&info, 0, sizeof(AltaircamFrameInfoV2));
 
-            //PrimaryCCD.setFrameBufferSize(subFrameSize, false);
-            //PrimaryCCD.setResolution(w, h);
-            //PrimaryCCD.setNAxis(m_Channels == 1 ? 2 : 3);
-            //PrimaryCCD.setBPP(m_BitsPerPixel);
-
             int captureBits = m_BitsPerPixel == 8 ? 8 : m_MaxBitDepth;
 
             if (Streamer->isStreaming())
@@ -2179,8 +2028,10 @@ void ALTAIRCAM::eventPullCallBack(unsigned event)
                 if (rc >= 0)
                     Streamer->newFrame(PrimaryCCD.getFrameBuffer(), PrimaryCCD.getFrameBufferSize());
             }
-            else
+            else if (InExposure)
             {
+                InExposure  = false;
+                PrimaryCCD.setExposureLeft(0);
                 uint8_t *buffer = PrimaryCCD.getFrameBuffer();
 
                 if (m_MonoCamera == false && m_CurrentVideoFormat == TC_VIDEO_COLOR_RGB)

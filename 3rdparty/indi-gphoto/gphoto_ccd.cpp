@@ -400,11 +400,6 @@ bool GPhotoCCD::initProperties()
     IUFillSwitchVector(&livePreviewSP, livePreviewS, 2, getDeviceName(), "AUX_VIDEO_STREAM", "Preview",
                        MAIN_CONTROL_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
-    IUFillSwitch(&streamSubframeS[0], "Enable", "", ISS_OFF);
-    IUFillSwitch(&streamSubframeS[1], "Disable", "", ISS_ON);
-    IUFillSwitchVector(&streamSubframeSP, streamSubframeS, 2, getDeviceName(), "STREAM_SUBFRAME", "Subframe",
-                       "Streaming", IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
-
     IUFillSwitch(&captureTargetS[CAPTURE_INTERNAL_RAM], "RAM", "", ISS_ON);
     IUFillSwitch(&captureTargetS[CAPTURE_SD_CARD], "SD Card", "", ISS_OFF);
     IUFillSwitchVector(&captureTargetSP, captureTargetS, 2, getDeviceName(), "CCD_CAPTURE_TARGET", "Capture Target",
@@ -431,12 +426,17 @@ bool GPhotoCCD::initProperties()
     SetCCDCapability(CCD_CAN_SUBFRAME | CCD_CAN_ABORT | CCD_HAS_BAYER | CCD_HAS_STREAMING);
 #endif
 
-    FI::SetCapability(FOCUSER_HAS_VARIABLE_SPEED);
+    Streamer->setStreamingExposureEnabled(false);
 
+#if 0
+    FI::SetCapability(FOCUSER_HAS_VARIABLE_SPEED);
     FocusSpeedN[0].min   = 0;
     FocusSpeedN[0].max   = 3;
     FocusSpeedN[0].step  = 1;
-    FocusSpeedN[0].value = 1;
+    FocusSpeedN[0].value = 3;
+#endif
+
+    FI::SetCapability(FOCUSER_CAN_REL_MOVE);
 
     /* JM 2014-05-20 Make PrimaryCCD.ImagePixelSizeNP writable since we can't know for now the pixel size and bit depth from gphoto */
     PrimaryCCD.getCCDInfo()->p = IP_RW;
@@ -459,32 +459,30 @@ void GPhotoCCD::ISGetProperties(const char * dev)
     defineText(&PortTP);
     loadConfig(true, "DEVICE_PORT");
 
-#if 0
     if (isConnected())
-    {
-        if (mExposurePresetSP.nsp > 0)
-            defineSwitch(&mExposurePresetSP);
-        if (mIsoSP.nsp > 0)
-            defineSwitch(&mIsoSP);
-        if (mFormatSP.nsp > 0)
-            defineSwitch(&mFormatSP);
+        return;
 
-        defineSwitch(&livePreviewSP);
-        defineSwitch(&transferFormatSP);
-        defineSwitch(&autoFocusSP);
-        defineSwitch(&FocusMotionSP);
-        defineNumber(&FocusSpeedNP);
-        defineNumber(&FocusTimerNP);
+    // Read Image Info if we have not connected yet.
+    double pixel = 0, pixel_x = 0, pixel_y = 0;
+    IUGetConfigNumber(getDeviceName(), "CCD_INFO", "CCD_PIXEL_SIZE", &pixel);
+    IUGetConfigNumber(getDeviceName(), "CCD_INFO", "CCD_PIXEL_SIZE_X", &pixel_x);
+    IUGetConfigNumber(getDeviceName(), "CCD_INFO", "CCD_PIXEL_SIZE_Y", &pixel_y);
 
-        if (captureTargetSP.s == IPS_OK)
-            defineSwitch(&captureTargetSP);
+    INumberVectorProperty *nvp = PrimaryCCD.getCCDInfo();
 
-        ShowExtendedOptions();
+    if (!nvp)
+        return;
 
-        if (strstr(gphoto_get_manufacturer(gphotodrv), "Canon"))
-            defineNumber(&mMirrorLockNP);
-    }
-#endif
+    // Load the necessary pixel size information
+    // The maximum resolution and bits per pixel depend on the capture itself.
+    // while the pixel size data remains constant.
+    if (pixel > 0)
+        nvp->np[INDI::CCDChip::CCD_PIXEL_SIZE].value = pixel;
+    if (pixel_x > 0)
+        nvp->np[INDI::CCDChip::CCD_PIXEL_SIZE_X].value = pixel_x;
+    if (pixel_y > 0)
+        nvp->np[INDI::CCDChip::CCD_PIXEL_SIZE_Y].value = pixel_y;
+
 }
 
 bool GPhotoCCD::updateProperties()
@@ -504,7 +502,8 @@ bool GPhotoCCD::updateProperties()
         defineSwitch(&transferFormatSP);
         defineSwitch(&autoFocusSP);
 
-        FI::updateProperties();
+        if (m_CanFocus)
+            FI::updateProperties();
 
         if (captureTargetSP.s == IPS_OK)
         {
@@ -538,7 +537,6 @@ bool GPhotoCCD::updateProperties()
             defineNumber(&TemperatureNP);
         }
 
-        defineSwitch(&streamSubframeSP);
         defineSwitch(&forceBULBSP);
 
         //timerID = SetTimer(POLLMS);
@@ -557,7 +555,8 @@ bool GPhotoCCD::updateProperties()
         deleteProperty(autoFocusSP.name);
         deleteProperty(transferFormatSP.name);
 
-        FI::updateProperties();
+        if (m_CanFocus)
+            FI::updateProperties();
 
         if (captureTargetSP.s != IPS_IDLE)
         {
@@ -569,7 +568,6 @@ bool GPhotoCCD::updateProperties()
 
         deleteProperty(SDCardImageSP.name);
 
-        deleteProperty(streamSubframeSP.name);
         deleteProperty(forceBULBSP.name);
 
         HideExtendedOptions();
@@ -664,23 +662,6 @@ bool GPhotoCCD::ISNewSwitch(const char * dev, const char * name, ISState * state
             }
 
             IDSetSwitch(&forceBULBSP, nullptr);
-            return true;
-        }
-
-        if (!strcmp(name, streamSubframeSP.name))
-        {
-            if (IUUpdateSwitch(&streamSubframeSP, states, names, n) < 0)
-                return false;
-
-            streamSubframeSP.s = IPS_OK;
-            IDSetSwitch(&streamSubframeSP, nullptr);
-
-            if (streamSubframeS[0].s == ISS_ON)
-                Streamer->setPixelFormat(INDI_RGB);
-            // otherwise, we send raw JPG
-            else
-                Streamer->setPixelFormat(INDI_JPG);
-
             return true;
         }
 
@@ -1095,6 +1076,8 @@ bool GPhotoCCD::Connect()
         captureTargetSP.s                      = IPS_OK;
     }
 
+    m_CanFocus = gphoto_can_focus(gphotodrv);
+
     LOGF_INFO("%s is online.", getDeviceName());
 
     if (!isSimulation() && gphoto_get_manufacturer(gphotodrv) && gphoto_get_model(gphotodrv))
@@ -1241,29 +1224,31 @@ void GPhotoCCD::TimerHit()
     }
     */
 
-    if (FocusTimerNP.s == IPS_BUSY)
-    {
-        char errMsg[MAXRBUF];
-        if (gphoto_manual_focus(gphotodrv, focusSpeed, errMsg) != GP_OK)
-        {
-            LOGF_ERROR("Focusing failed: %s", errMsg);
-            FocusTimerNP.s       = IPS_ALERT;
-            FocusTimerN[0].value = 0;
-        }
-        else
-        {
-            FocusTimerN[0].value -= FOCUS_TIMER;
-            if (FocusTimerN[0].value <= 0)
-            {
-                FocusTimerN[0].value = 0;
-                FocusTimerNP.s       = IPS_OK;
-            }
-            else if (timerID == -1)
-                timerID = SetTimer(FOCUS_TIMER);
-        }
+    //    if (FocusTimerNP.s == IPS_BUSY)
+    //    {
+    //        char errMsg[MAXRBUF];
+    //        if (gphoto_manual_focus(gphotodrv, focusSpeed, errMsg) != GP_OK)
+    //        {
+    //            LOGF_ERROR("Focusing failed: %s", errMsg);
+    //            FocusTimerNP.s       = IPS_ALERT;
+    //            FocusTimerN[0].value = 0;
+    //        }
+    //        else
+    //        {
+    //            FocusTimerN[0].value -= FOCUS_TIMER;
+    //            if (FocusTimerN[0].value <= 0)
+    //            {
+    //                FocusTimerN[0].value = 0;
+    //                FocusTimerNP.s       = IPS_OK;
+    //                if (Streamer->isBusy() == false)
+    //                    gphoto_set_view_finder(gphotodrv, false);
+    //            }
+    //            else if (timerID == -1)
+    //                timerID = SetTimer(FOCUS_TIMER);
+    //        }
 
-        IDSetNumber(&FocusTimerNP, nullptr);
-    }
+    //        IDSetNumber(&FocusTimerNP, nullptr);
+    //    }
 
     if (InExposure)
     {
@@ -1350,32 +1335,42 @@ void GPhotoCCD::UpdateExtendedOptions(bool force)
 
 bool GPhotoCCD::grabImage()
 {
-    //char ext[16];
     uint8_t * memptr = PrimaryCCD.getFrameBuffer();
     size_t memsize = 0;
     int fd = 0, naxis = 2, w = 0, h = 0, bpp = 8;
 
     if (isSimulation())
     {
-        w                   = PrimaryCCD.getXRes();
-        h                   = PrimaryCCD.getYRes();
-        size_t fullbuf_size = w * h + 512;
-        uint8_t * fullbuf    = (uint8_t *)malloc(fullbuf_size);
-        for (int i = 0; i < h; i++)
-            for (int j = 0; j < w; j++)
-                fullbuf[i * w + j] = rand() % 255;
+        uint16_t subW = PrimaryCCD.getSubW() / PrimaryCCD.getBinX();
+        uint16_t subH = PrimaryCCD.getSubH() / PrimaryCCD.getBinY();
 
-        // Starting address if subframing
-        memptr  = fullbuf + (PrimaryCCD.getSubY() * PrimaryCCD.getXRes()) + PrimaryCCD.getSubX();
-        memsize = PrimaryCCD.getSubW() * PrimaryCCD.getSubH() * PrimaryCCD.getBPP() / 8;
+        subW -= subW % 2;
+        subH -= subH % 2;
 
-        PrimaryCCD.setFrameBuffer(memptr);
-        PrimaryCCD.setFrameBufferSize(memsize, false);
-        //PrimaryCCD.setResolution(w, h);
-        //PrimaryCCD.setFrame(0, 0, w, h);
-        PrimaryCCD.setNAxis(naxis);
-        PrimaryCCD.setBPP(bpp);
+        uint32_t size = subW * subH;
 
+        if (PrimaryCCD.getFrameBufferSize() < static_cast<int>(size))
+        {
+            PrimaryCCD.setFrameBufferSize(size);
+            memptr = PrimaryCCD.getFrameBuffer();
+        }
+
+        // TODO
+        // Need to simulate bayer
+        // Need to simulate subframing
+        if (PrimaryCCD.getBPP() == 8)
+        {
+            for (uint32_t i = 0 ; i < size; i++)
+                memptr[i] = rand() % 255;
+        }
+        else
+        {
+            uint16_t *buffer = reinterpret_cast<uint16_t*>(memptr);
+            for (uint32_t i = 0 ; i < size; i++)
+                buffer[i] = rand() % 65535;
+        }
+
+        PrimaryCCD.setFrame(PrimaryCCD.getSubX(), PrimaryCCD.getSubY(), subW, subH);
         ExposureComplete(&PrimaryCCD);
         return true;
     }
@@ -1418,8 +1413,9 @@ bool GPhotoCCD::grabImage()
             return false;
         }
 
-        /* We're done exposing */
-        LOG_INFO("Exposure done, downloading image...");
+        // We're done exposing
+        if (ExposureRequest > 3)
+            LOG_INFO("Exposure done, downloading image...");
 
         if (strcasecmp(gphoto_get_file_extension(gphotodrv), "jpg") == 0 ||
                 strcasecmp(gphoto_get_file_extension(gphotodrv), "jpeg") == 0)
@@ -1438,15 +1434,6 @@ bool GPhotoCCD::grabImage()
         }
         else
         {
-            /*if (read_dcraw(tmpfile, &memptr, &memsize, &naxis, &w, &h, &bpp))
-                {
-                    LOG_ERROR("Exposure failed to parse raw image.");
-                    unlink(tmpfile);
-                    return false;
-                }
-
-                LOGF_DEBUG("read_dcraw: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d)", memsize, naxis, w, h, bpp);*/
-
             char bayer_pattern[8] = {};
 
             if (read_libraw(tmpfile, &memptr, &memsize, &naxis, &w, &h, &bpp, bayer_pattern))
@@ -1456,7 +1443,7 @@ bool GPhotoCCD::grabImage()
                 return false;
             }
 
-            LOGF_DEBUG("read_libraw: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d) pattern (%s)",
+            LOGF_DEBUG("read_libraw: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d) bayer pattern (%s)",
                        memsize, naxis, w, h, bpp, bayer_pattern);
 
             unlink(tmpfile);
@@ -1469,63 +1456,73 @@ bool GPhotoCCD::grabImage()
         PrimaryCCD.setImageExtension("fits");
 
         // If subframing is requested
-        /*if (frameInitialized &&
-                PrimaryCCD.getSubH() < PrimaryCCD.getYRes() || PrimaryCCD.getSubW() < PrimaryCCD.getXRes())*/
         if (PrimaryCCD.getSubW() < w || PrimaryCCD.getSubH() < h)
         {
-            int subFrameSize     = PrimaryCCD.getSubW() * PrimaryCCD.getSubH() * bpp / 8 * ((naxis == 3) ? 3 : 1);
-            int oneFrameSize     = PrimaryCCD.getSubW() * PrimaryCCD.getSubH() * bpp / 8;
-            uint8_t * subframeBuf = (uint8_t *)malloc(subFrameSize);
+            uint16_t subX = PrimaryCCD.getSubX();
+            uint16_t subY = PrimaryCCD.getSubY();
+            uint16_t subW = PrimaryCCD.getSubW();
+            uint16_t subH = PrimaryCCD.getSubH();
 
-            int startY = PrimaryCCD.getSubY();
-            int endY   = startY + PrimaryCCD.getSubH();
-            int lineW  = PrimaryCCD.getSubW() * bpp / 8;
-            int subX   = PrimaryCCD.getSubX();
+            // Align all boundaries to be even
+            // This should fix issues with subframed bayered images.
+            //            subX -= subX % 2;
+            //            subY -= subY % 2;
+            //            subW -= subW % 2;
+            //            subH -= subH % 2;
 
-            LOGF_DEBUG("Subframing... subFrameSize: %d - oneFrameSize: %d - startY: %d - endY: %d - lineW: %d - subX: %d", subFrameSize, oneFrameSize,
-                       startY, endY, lineW, subX);
+            int subFrameSize     = subW * subH * bpp / 8 * ((naxis == 3) ? 3 : 1);
+            int oneFrameSize     = subW * subH * bpp / 8;
+            //uint8_t * subframeBuf = new uint8_t[subFrameSize];
+
+            int lineW  = subW * bpp / 8;
+
+            LOGF_DEBUG("Subframing... subFrameSize: %d - oneFrameSize: %d - subX: %d - subY: %d - subW: %d - subH: %d",
+                       subFrameSize, oneFrameSize,
+                       subX, subY, subW, subH);
 
             if (naxis == 2)
             {
-                for (int i = startY; i < endY; i++)
-                    memcpy(subframeBuf + (i - startY) * lineW, memptr + (i * w + subX) * bpp / 8, lineW);
+                for (int i = subY; i < subY + subH; i++)
+                    memcpy(memptr + (i - subY) * lineW, memptr + (i * w + subX) * bpp / 8, lineW);
+                //memcpy(subframeBuf + (i - subY) * lineW, memptr + (i * w + subX) * bpp / 8, lineW);
             }
             else
             {
-                uint8_t * subR = subframeBuf;
-                uint8_t * subG = subframeBuf + oneFrameSize;
-                uint8_t * subB = subframeBuf + oneFrameSize * 2;
+                //                uint8_t * subR = subframeBuf;
+                //                uint8_t * subG = subframeBuf + oneFrameSize;
+                //                uint8_t * subB = subframeBuf + oneFrameSize * 2;
+                uint8_t * subR = memptr;
+                uint8_t * subG = memptr + oneFrameSize;
+                uint8_t * subB = memptr + oneFrameSize * 2;
 
                 uint8_t * startR = memptr;
                 uint8_t * startG = memptr + (w * h * bpp / 8);
                 uint8_t * startB = memptr + (w * h * bpp / 8 * 2);
 
-                for (int i = startY; i < endY; i++)
+                for (int i = subY; i < subY + subH; i++)
                 {
-                    memcpy(subR + (i - startY) * lineW, startR + (i * w + subX) * bpp / 8, lineW);
-                    memcpy(subG + (i - startY) * lineW, startG + (i * w + subX) * bpp / 8, lineW);
-                    memcpy(subB + (i - startY) * lineW, startB + (i * w + subX) * bpp / 8, lineW);
+                    memcpy(subR + (i - subY) * lineW, startR + (i * w + subX) * bpp / 8, lineW);
+                    memcpy(subG + (i - subY) * lineW, startG + (i * w + subX) * bpp / 8, lineW);
+                    memcpy(subB + (i - subY) * lineW, startB + (i * w + subX) * bpp / 8, lineW);
                 }
             }
 
-            PrimaryCCD.setFrameBuffer(subframeBuf);
-            PrimaryCCD.setFrameBufferSize(subFrameSize, false);
+            PrimaryCCD.setFrameBuffer(memptr);
+            PrimaryCCD.setFrameBufferSize(memsize, false);
             PrimaryCCD.setResolution(w, h);
+            PrimaryCCD.setFrame(subX, subY, subW, subH);
             PrimaryCCD.setNAxis(naxis);
             PrimaryCCD.setBPP(bpp);
 
             ExposureComplete(&PrimaryCCD);
 
             // Restore old pointer and release memory
-            PrimaryCCD.setFrameBuffer(memptr);
-            PrimaryCCD.setFrameBufferSize(memsize, false);
-            free(subframeBuf);
+            //PrimaryCCD.setFrameBuffer(memptr);
+            //PrimaryCCD.setFrameBufferSize(memsize, false);
+            //delete [] (subframeBuf);
         }
         else
         {
-            // We need to initially set the frame dimensions for the first time since it is unknown at the time of connection.
-            //frameInitialized = true;
-
             if (PrimaryCCD.getSubW() != 0 && (w > PrimaryCCD.getSubW() || h > PrimaryCCD.getSubH()))
                 LOGF_WARN("Camera image size (%dx%d) is less than requested size (%d,%d). Update frame size to match camera size.", w, h, PrimaryCCD.getSubW(), PrimaryCCD.getSubH());
 
@@ -1539,6 +1536,7 @@ bool GPhotoCCD::grabImage()
             ExposureComplete(&PrimaryCCD);
         }
     }
+    // Read Native image AS IS
     else
     {
         int rc = gphoto_read_exposure(gphotodrv);
@@ -1552,13 +1550,14 @@ bool GPhotoCCD::grabImage()
             return false;
         }
 
-        /* We're done exposing */
-        LOG_DEBUG("Exposure done, downloading image...");
+        // We're done exposing
+        if (ExposureRequest > 3)
+            LOG_DEBUG("Exposure done, downloading image...");
         uint8_t * newMemptr = nullptr;
         gphoto_get_buffer(gphotodrv, (const char **)&newMemptr, &memsize);
-        memptr = (uint8_t *)realloc(memptr,
-                                    memsize); // We copy the obtained memory pointer to avoid freeing some gphoto memory
-        memcpy(memptr, newMemptr, memsize);   //
+        // We copy the obtained memory pointer to avoid freeing some gphoto memory
+        memptr = static_cast<uint8_t *>(realloc(memptr, memsize));
+        memcpy(memptr, newMemptr, memsize);
 
         gphoto_get_dimensions(gphotodrv, &w, &h);
 
@@ -1750,14 +1749,19 @@ void GPhotoCCD::HideExtendedOptions(void)
     }
 }
 
+#if 0
 IPState GPhotoCCD::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
 {
-    INDI_UNUSED(duration);
-
-    /* gphoto works with steps */
-
     if (isSimulation() || speed == 0)
         return IPS_OK;
+
+    // Set speed accordng to duration
+    if (duration >= 1000)
+        speed = 3;
+    else if (duration >= 250)
+        speed = 2;
+    else
+        speed = 1;
 
     if (dir == FOCUS_INWARD)
         focusSpeed = speed * -1;
@@ -1765,6 +1769,9 @@ IPState GPhotoCCD::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
         focusSpeed = speed;
 
     LOGF_DEBUG("Setting focuser speed to %d", focusSpeed);
+
+    FocusTimerNP.s = IPS_BUSY;
+    IDSetNumber(&FocusTimerNP, nullptr);
 
     /*while (duration-->0)
     {
@@ -1775,9 +1782,23 @@ IPState GPhotoCCD::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
        }
     }*/
 
-    SetTimer(FOCUS_TIMER);
+    // If we have a view finder, let's turn it on
+    if (Streamer->isBusy() == false)
+        gphoto_set_view_finder(gphotodrv, true);
 
-    return IPS_BUSY;
+    //SetTimer(FOCUS_TIMER);
+
+    char errMsg[MAXRBUF];
+    if (gphoto_manual_focus(gphotodrv, focusSpeed, errMsg) != GP_OK)
+    {
+        LOGF_ERROR("Focusing failed: %s", errMsg);
+        return IPS_ALERT;
+    }
+    else if (Streamer->isBusy() == false)
+        gphoto_set_view_finder(gphotodrv, false);
+
+    FocusTimerN[0].value = 0;
+    return IPS_OK;
 }
 
 bool GPhotoCCD::SetFocuserSpeed(int speed)
@@ -1786,6 +1807,73 @@ bool GPhotoCCD::SetFocuserSpeed(int speed)
         return true;
 
     return false;
+}
+#endif
+
+IPState GPhotoCCD::MoveRelFocuser(FocusDirection dir, uint32_t ticks)
+{
+    INDI_UNUSED(dir);
+
+    // Reduce by a factor of 10
+    double adaptiveTicks = ticks / 10.0;
+
+    double largeStep = adaptiveTicks / (FOCUS_HIGH_MED_RATIO * FOCUS_MED_LOW_RATIO);
+    double medStep   = (largeStep - rint(largeStep)) * FOCUS_HIGH_MED_RATIO;
+    double lowStep   = (medStep - rint(medStep)) * FOCUS_MED_LOW_RATIO;
+
+    m_TargetLargeStep = rint(fabs(largeStep));
+    m_TargetMedStep = rint(fabs(medStep));
+    m_TargetLowStep = rint(fabs(lowStep));
+
+    if (m_FocusTimerID > 0)
+        RemoveTimer(m_FocusTimerID);
+
+    m_FocusTimerID = IEAddTimer(FOCUS_TIMER, &GPhotoCCD::UpdateFocusMotionHelper, this);
+
+    return IPS_BUSY;
+}
+
+void GPhotoCCD::UpdateFocusMotionHelper(void *context)
+{
+    static_cast<GPhotoCCD*>(context)->UpdateFocusMotionCallback();
+}
+
+void GPhotoCCD::UpdateFocusMotionCallback()
+{
+    char errmsg[MAXRBUF] = {0};
+    int focusSpeed = -1;
+
+    if (m_TargetLargeStep > 0)
+    {
+        m_TargetLargeStep--;
+        focusSpeed = IUFindOnSwitchIndex(&FocusMotionSP) == FOCUS_INWARD ? -3 : 3;
+    }
+    else if (m_TargetMedStep > 0)
+    {
+        m_TargetMedStep--;
+        focusSpeed = IUFindOnSwitchIndex(&FocusMotionSP) == FOCUS_INWARD ? -2 : 2;
+    }
+    else if (m_TargetLowStep > 0)
+    {
+        m_TargetLowStep--;
+        focusSpeed = IUFindOnSwitchIndex(&FocusMotionSP) == FOCUS_INWARD ? -1 : 1;
+    }
+
+    if (gphoto_manual_focus(gphotodrv, focusSpeed, errmsg) != GP_OK)
+    {
+        LOGF_ERROR("Focusing failed: %s", errmsg);
+        FocusRelPosNP.s = IPS_ALERT;
+        IDSetNumber(&FocusRelPosNP, nullptr);
+        return;
+    }
+
+    if (m_TargetLargeStep == 0 && m_TargetMedStep == 0 && m_TargetLowStep == 0)
+    {
+        FocusRelPosNP.s = IPS_OK;
+        IDSetNumber(&FocusRelPosNP, nullptr);
+    }
+    else
+        m_FocusTimerID = IEAddTimer(FOCUS_TIMER, &GPhotoCCD::UpdateFocusMotionHelper, this);
 }
 
 bool GPhotoCCD::StartStreaming()
@@ -1798,13 +1886,7 @@ bool GPhotoCCD::StartStreaming()
 
     if (gphoto_start_preview(gphotodrv) == GP_OK)
     {
-        // If we're subframing, then we send RGB
-        if (streamSubframeS[0].s == ISS_ON)
-            Streamer->setPixelFormat(INDI_RGB);
-        // otherwise, we send raw JPG
-        else
-            Streamer->setPixelFormat(INDI_JPG);
-
+        Streamer->setPixelFormat(INDI_RGB);
         std::unique_lock<std::mutex> guard(liveStreamMutex);
         m_RunLiveStream = true;
         guard.unlock();
@@ -1869,19 +1951,19 @@ void GPhotoCCD::streamLiveView()
 
         unsigned char * inBuffer = (unsigned char *)(const_cast<char *>(previewData));
 
-        if (streamSubframeS[1].s == ISS_ON)
-        {
-            if (liveVideoWidth <= 0)
-            {
-                read_jpeg_size(inBuffer, previewSize, &liveVideoWidth, &liveVideoHeight);
-                Streamer->setSize(liveVideoWidth, liveVideoHeight);
-            }
+        //        if (streamSubframeS[1].s == ISS_ON)
+        //        {
+        //            if (liveVideoWidth <= 0)
+        //            {
+        //                read_jpeg_size(inBuffer, previewSize, &liveVideoWidth, &liveVideoHeight);
+        //                Streamer->setSize(liveVideoWidth, liveVideoHeight);
+        //            }
 
-            std::unique_lock<std::mutex> ccdguard(ccdBufferLock);
-            Streamer->newFrame(inBuffer, previewSize);
-            ccdguard.unlock();
-            continue;
-        }
+        //            std::unique_lock<std::mutex> ccdguard(ccdBufferLock);
+        //            Streamer->newFrame(inBuffer, previewSize);
+        //            ccdguard.unlock();
+        //            continue;
+        //        }
 
         uint8_t * ccdBuffer      = PrimaryCCD.getFrameBuffer();
         size_t size             = 0;
@@ -1896,6 +1978,13 @@ void GPhotoCCD::streamLiveView()
             LOG_ERROR("Error getting live video frame.");
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
+        }
+
+        if (liveVideoWidth <= 0)
+        {
+            liveVideoWidth = w;
+            liveVideoHeight = h;
+            Streamer->setSize(liveVideoWidth, liveVideoHeight);
         }
 
         PrimaryCCD.setFrameBuffer(ccdBuffer);
@@ -2031,8 +2120,8 @@ bool GPhotoCCD::saveConfigItems(FILE * fp)
     // Transfer Format
     IUSaveConfigSwitch(fp, &transferFormatSP);
 
-    // Subframe Stream
-    IUSaveConfigSwitch(fp, &streamSubframeSP);
+    //    // Subframe Stream
+    //    IUSaveConfigSwitch(fp, &streamSubframeSP);
 
     // Force BULB Mode
     IUSaveConfigSwitch(fp, &forceBULBSP);

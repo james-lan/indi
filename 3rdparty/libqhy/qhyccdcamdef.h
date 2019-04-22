@@ -3,7 +3,7 @@
 #ifndef __QHYCCDCAMDEF_H__
 #define __QHYCCDCAMDEF_H__
 
-#include "config.h"
+
 
 /* IMG series */
 
@@ -495,6 +495,8 @@
  * Type define for UNKNOW */
 #define DEVICETYPE_UNKNOW       -1
 
-#define MAX_EXPOSURE_TIMES	(1800) //s
+#define MAX_EXPOSURE_TIMES	(3600) //s
+
+#define MREMAINING_MAX_EXPOSURETIMES	(3000)//ms
 
 #endif
