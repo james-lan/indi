@@ -42,7 +42,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301  USA
 
 #include <mutex>
 
-#define LX200_TIMEOUT 5 /* FD timeout in seconds */
+#define LX200_TIMEOUT 1 /* FD timeout in seconds */
 #define RB_MAX_LEN    64
 
 
