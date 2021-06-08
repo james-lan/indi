@@ -112,10 +112,20 @@
 #define OnStep
 #define RB_MAX_LEN 64
 
-#define MAX_OUTPUTS_COUNT 10
+//OnStep is currently limited to 8 Features
+#define MAX_FEATURE_COUNT 8 
 #define OUTPUT_STARTING_PORT 0
 
 
+
+enum OnStep_Ouput_Types { OUTPUT_NONE, OUTPUT_SWITCH, OUTPUT_ANALOG, OUTPUT_DEW_HEATER, OUTPUT_INTERVALOMETER, OUTPUT_SWITCH_UNPARKED };
+
+struct OnStep_Output_Data { //Referenced by 
+    OnStep_Ouput_Types type = OUTPUT_NONE;
+    int num = -1; //1 indexed
+    char feature_name[9] = {0}; //
+    double temp = -274; //May be hard to test or handled elsewhere. -274 = Not present 
+};
 
 enum Errors {ERR_NONE, ERR_MOTOR_FAULT, ERR_ALT_MIN, ERR_LIMIT_SENSE, ERR_DEC, ERR_AZM, ERR_UNDER_POLE, ERR_MERIDIAN, ERR_SYNC, ERR_PARK, ERR_GOTO_SYNC, ERR_UNSPECIFIED, ERR_ALT_MAX, ERR_GOTO_ERR_NONE, ERR_GOTO_ERR_BELOW_HORIZON, ERR_GOTO_ERR_ABOVE_OVERHEAD, ERR_GOTO_ERR_STANDBY, ERR_GOTO_ERR_PARK, ERR_GOTO_ERR_GOTO, ERR_GOTO_ERR_OUTSIDE_LIMITS, ERR_GOTO_ERR_HARDWARE_FAULT, ERR_GOTO_ERR_IN_MOTION, ERR_GOTO_ERR_UNSPECIFIED};
 enum RateCompensation {RC_NONE, RC_REFR_RA, RC_REFR_BOTH, RC_FULL_RA, RC_FULL_BOTH}; //To allow for using one variable instead of two in the future
@@ -212,10 +222,10 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         bool OSAlignCompleted = false;
 
         //Outputs
-        IPState OSEnableOutput(int output);
-        IPState OSDisableOutput(int output);
-        bool OSGetOutputState(int output);
-
+        IPState OSOutSwitchOn(int output);
+        IPState OSOutSwitchOff(int output);
+        bool OSGetOutSwitchState(int output);
+        IPState OSOutAnalog(int output, double value);
 
         bool sendOnStepCommand(const char *cmd);
         bool sendOnStepCommandBlind(const char *cmd);
@@ -357,8 +367,12 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         ISwitch OSOutput2S[2];
 
         int highest_output=0;
-        INumber OutputPorts[MAX_OUTPUTS_COUNT];
+        int num_outputs=0;
+        INumber OutputPorts[MAX_FEATURE_COUNT];
         INumberVectorProperty OutputPorts_NP;
+        
+        OnStep_Output_Data OSOutputs[MAX_FEATURE_COUNT];
+        
 
         INumber GuideRateN[2];
         INumberVectorProperty GuideRateNP;
