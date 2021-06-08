@@ -356,14 +356,14 @@ bool LX200_OnStep::initProperties()
                        IPS_ALERT);
 #endif
 
-    for(int i = 0; i < PORTS_COUNT; i++)
+    for(int i = 0; i < MAX_OUTPUTS_COUNT; i++)
     {
         char port_name[30];
         sprintf(port_name, "Output %d", i);
         IUFillNumber(&OutputPorts[i], port_name, port_name, "%g", 0, 255, 1, 0);
     }
 
-    IUFillNumberVector(&OutputPorts_NP, OutputPorts, PORTS_COUNT, getDeviceName(), "Outputs", "Outputs",  OUTPUT_TAB, IP_WO, 60,
+    IUFillNumberVector(&OutputPorts_NP, OutputPorts, MAX_OUTPUTS_COUNT, getDeviceName(), "Outputs", "Outputs",  OUTPUT_TAB, IP_WO, 60,
                        IPS_OK);
 
 
@@ -897,7 +897,7 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
         else
         {
             OSFocus2TargNP.s = IPS_ALERT;
-            IDSetNumber(&OSFocus2TargNP, "Setting Max Slew Rate Failed");
+            IDSetNumber(&OSFocus2TargNP, "Moving Focuser 2 relative move exceeds max limits");
         }
         return true;
     }
@@ -912,7 +912,7 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
             {
                 int ret;
                 char cmd[20];
-                int port = STARTING_PORT + i;
+                int port = OUTPUT_STARTING_PORT + i;
 
                 //This is for newer version of OnStep:
                 snprintf(cmd, sizeof(cmd), ":SXX%d,V%d#", port, value);
@@ -3727,17 +3727,20 @@ void LX200_OnStep::Init_Outputs()
     char configured[10];
     char p_name[20];
     size_t  k;
+    highest_output = 0;
     
     getCommandString(PortFD, configured, ":GXY0#"); // retrurns a string with 1 where Feature is configured
     // ex: 10010010 means Feature 1,4 and 7 are configured
     
-    IUFillNumber(&OutputPorts[0], "Unconfigured", "Unconfigured", "%g", 0, 255, 1, 0);
-    for(int i = 1; i < PORTS_COUNT; i++)
+    // Index starts at 1
+//     IUFillNumber(&OutputPorts[0], "Unconfigured", "Unconfigured", "%g", 0, 255, 1, 0);
+    for(int i = 1; i < MAX_OUTPUTS_COUNT; i++)
     {
         k=0;
         if(configured[i-1]=='1') // is Feature is configured
         {
-        sprintf(getoutp, ":GXY%d#", i);
+            if ( i > highest_output) highest_output=i-1;
+            sprintf(getoutp, ":GXY%d#", i);
             getCommandString(PortFD, port_name, getoutp);
             for(k=0;k<strlen(port_name);k++)    // remove feature type
             {
@@ -3745,13 +3748,17 @@ void LX200_OnStep::Init_Outputs()
                 p_name[k]=port_name[k];
                 p_name[k+1]=0;
             }
-            IUFillNumber(&OutputPorts[i], p_name, p_name, "%g", 0, 255, 1, 0);
+            IUFillNumber(&OutputPorts[i-1], p_name, p_name, "%g", 0, 255, 1, 0);
         }
         else
         {
-            IUFillNumber(&OutputPorts[i], "Unconfigured", "Unconfigured", "%g", 0, 255, 1, 0);
+            IUFillNumber(&OutputPorts[i-1], "Unconfigured", "Unconfigured", "%g", 0, 255, 1, 0);
         }
     }
+
+    //Redefine it so we don't have extra ports
+    IUFillNumberVector(&OutputPorts_NP, OutputPorts, highest_output, getDeviceName(), "Outputs", "Outputs",  OUTPUT_TAB, IP_WO, 60,
+                       IPS_OK);
     defineProperty(&OutputPorts_NP);
 }
 

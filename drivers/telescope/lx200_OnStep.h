@@ -112,8 +112,8 @@
 #define OnStep
 #define RB_MAX_LEN 64
 
-#define PORTS_COUNT 10
-#define STARTING_PORT 0
+#define MAX_OUTPUTS_COUNT 10
+#define OUTPUT_STARTING_PORT 0
 
 
 
@@ -356,8 +356,8 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         ISwitchVectorProperty OSOutput2SP;
         ISwitch OSOutput2S[2];
 
-
-        INumber OutputPorts[PORTS_COUNT];
+        int highest_output=0;
+        INumber OutputPorts[MAX_OUTPUTS_COUNT];
         INumberVectorProperty OutputPorts_NP;
 
         INumber GuideRateN[2];
