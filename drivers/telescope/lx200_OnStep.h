@@ -368,11 +368,38 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
 
         int highest_output=0;
         int num_outputs=0;
+        int num_switches=0;
+        int num_analog=0;
+        int num_dewheater=0;
+        int num_intervalometer=0;
+        // NOTE: These could be reallocated at runtime, but for now just allocate the max.
+        OnStep_Output_Data OSOutputs[MAX_FEATURE_COUNT];
         INumber OutputPorts[MAX_FEATURE_COUNT];
         INumberVectorProperty OutputPorts_NP;
-        
-        OnStep_Output_Data OSOutputs[MAX_FEATURE_COUNT];
-        
+        ISwitch OSOutputSwitches[MAX_FEATURE_COUNT]; //Switches or Unparked Switches
+        ISwitchVectorProperty OSOutputSwitchesSP;
+        INumber OSOutputAnalog[MAX_FEATURE_COUNT]; //Analog (8-bit PWM) output
+        INumberVectorProperty OSOutputAnalogNP;
+        //Dew Heaters
+        //NOTE: Annoyingly doing it this way will result in it showing up as all the Zeros/Spans/Switch instead of grouping it by #1, #2 (Not that I think there will be much of that.)
+        INumber OSOutputDewHeaterZero[MAX_FEATURE_COUNT];
+        INumber OSOutputDewHeaterSpan[MAX_FEATURE_COUNT];
+        ISwitch OSOutputDewHeaterSwitch[MAX_FEATURE_COUNT];
+        INumberVectorProperty OSOutputDewHeaterZeroNP;
+        INumberVectorProperty OSOutputDewHeaterSpanNP;
+        ISwitchVectorProperty OSOutputDewHeaterSwitchSP;
+        // End Dew Heaters
+        // Intervalometer
+        //NOTE: Annoyingly doing it this way will result in it showing up as all the Counts/Exposure/Delay instead of grouping it by #1, #2 (Not that I think there will be much of that.)
+        INumber OSOutputIntervalometerExposure[MAX_FEATURE_COUNT];
+        INumber OSOutputIntervalometerDelay[MAX_FEATURE_COUNT];
+        INumber OSOutputIntervalometerCount[MAX_FEATURE_COUNT];
+        ISwitch OSOutputIntervalometerSwitch[MAX_FEATURE_COUNT];
+        INumberVectorProperty OSOutputIntervalometerExposureNP;
+        INumberVectorProperty OSOutputIntervalometerDelayNP;
+        INumberVectorProperty OSOutputIntervalometerCountNP;
+        ISwitchVectorProperty OSOutputIntervalometerStartSP;
+        // End Intervalometer
 
         INumber GuideRateN[2];
         INumberVectorProperty GuideRateNP;

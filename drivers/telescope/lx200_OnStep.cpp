@@ -367,6 +367,25 @@ bool LX200_OnStep::initProperties()
     IUFillNumberVector(&OutputPorts_NP, OutputPorts, MAX_FEATURE_COUNT, getDeviceName(), "Outputs", "Outputs",  OUTPUT_TAB, IP_WO, 60,
                        IPS_OK);
 
+    for(int i = 0; i < MAX_FEATURE_COUNT; i++)
+    {
+        char switch_name[30];
+        sprintf(switch_name, "Switch Output %d", i);
+        IUFillSwitch(&OSOutputSwitches[0], "0", "OFF", ISS_ON);
+        IUFillSwitch(&OSOutputSwitches[1], "1", "ON", ISS_OFF);
+    }
+    IUFillSwitchVector();
+    IUFillSwitchVector(&OSOutputSwitches, OSOutputSwitches, num_switches, getDeviceName(), "Switches", "Switches",  OUTPUT_TAB, IP_WO, 60,
+                       IPS_OK);
+    
+    for(int i = 0; i < MAX_FEATURE_COUNT; i++)
+    {
+        char switch_name[30];
+        sprintf(switch_name, "Analog Output %d", i);
+        IUFillNumber(&OSOutputAnalog[i], switch_name, switch_name, "%g", 0, 255, 1, 0);
+    }
+    IUFillNumberVector(&OSOutputAnalogNP, OSOutputAnalog, MAX_FEATURE_COUNT, getDeviceName(), "Outputs", "Outputs",  OUTPUT_TAB, IP_WO, 60,
+                       IPS_OK);
 
     // ============== STATUS_TAB
     IUFillText(&OnstepStat[0], ":GU# return", "", "");
