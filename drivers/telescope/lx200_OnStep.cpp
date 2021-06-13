@@ -39,7 +39,7 @@
 
 #define ONSTEP_TIMEOUT  1
 #define ONSTEP_TIMEOUT_SECONDS 0
-#define ONSTEP_TIMEOUT_MICROSECONDS 100
+#define ONSTEP_TIMEOUT_MICROSECONDS 0
 #define RA_AXIS     0
 #define DEC_AXIS    1
 
@@ -2586,7 +2586,6 @@ int LX200_OnStep::getCommandSingleCharResponse(int fd, char *data, const char *c
     char *term;
     int error_type;
     int nbytes_write = 0, nbytes_read = 0;
-    int timeout = 1;
     
     DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
     
@@ -2596,7 +2595,8 @@ int LX200_OnStep::getCommandSingleCharResponse(int fd, char *data, const char *c
     if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
         return error_type;
     
-    error_type = tty_read(fd, data, 1, timeout, &nbytes_read);
+//     error_type = tty_read(fd, data, 1, timeout, &nbytes_read);
+    error_type = tty_read_expanded(fd, data, 1, ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
     tcflush(fd, TCIFLUSH);
     
     if (error_type != TTY_OK)
@@ -2618,7 +2618,7 @@ int LX200_OnStep::getCommandSingleCharErrorOrLongResponse(int fd, char *data, co
     char *term;
     int error_type;
     int nbytes_write = 0, nbytes_read = 0;
-    int timeout = 1;
+
     
     DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
     
@@ -2628,7 +2628,8 @@ int LX200_OnStep::getCommandSingleCharErrorOrLongResponse(int fd, char *data, co
     if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
         return error_type;
     
-    error_type = tty_read_section(fd, data, '#', timeout, &nbytes_read);
+//     error_type = tty_read_section(fd, data, '#', timeout, &nbytes_read);
+    error_type = tty_read_section_expanded(fd, data, '#', ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
     tcflush(fd, TCIFLUSH);
     
 
