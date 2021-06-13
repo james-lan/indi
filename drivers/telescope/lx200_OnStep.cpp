@@ -38,6 +38,8 @@
 #define ROTATOR_TAB "Rotator"
 
 #define ONSTEP_TIMEOUT  1
+#define ONSTEP_TIMEOUT_SECONDS 0
+#define ONSTEP_TIMEOUT_MICROSECONDS 100
 #define RA_AXIS     0
 #define DEC_AXIS    1
 
@@ -2565,7 +2567,7 @@ bool LX200_OnStep::sendOnStepCommand(const char *cmd)
     if ((error_type = tty_write_string(PortFD, cmd, &nbytes_write)) != TTY_OK)
         return error_type;
 
-    error_type = tty_read(PortFD, response, 1, ONSTEP_TIMEOUT, &nbytes_read);
+    error_type = tty_read_expanded(PortFD, response, 1, ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
 
     tcflush(PortFD, TCIFLUSH);
     DEBUGF(DBG_SCOPE, "RES <%c>", response[0]);
