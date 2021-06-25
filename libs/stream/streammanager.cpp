@@ -428,7 +428,7 @@ void StreamManagerPrivate::asyncStreamThread()
 
         if (sourceBuffer->size() != srcFrameInfo.totalSize())
         {
-            LOG_ERROR("Invalid source buffer size, skipping frame...");
+            LOGF_ERROR("Invalid source buffer size, skipping frame... got: %i, expected %i", sourceBuffer->size(), srcFrameInfo.totalSize() );
             continue;
         }
 
