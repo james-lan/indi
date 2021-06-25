@@ -2382,7 +2382,8 @@ bool LX200_OnStep::ReadScopeStatus()
     setParameterValue("WEATHER_DEWPOINT", std::stod(TempValue));
     if (OSCpuTemp_good) {
         int error_return = getCommandSingleCharErrorOrLongResponse(PortFD, TempValue, ":GX9F#");
-        if ( error_return >= 0 && !strcmp(TempValue,"0") ) {
+        if ( error_return >= 0 && !(TempValue[0] == '0' && TempValue[1] == '\0') ) 
+        {
             setParameterValue("WEATHER_CPU_TEMPERATURE", std::stod(TempValue));
         } else {
             LOGF_DEBUG("CPU Temp not responded to, disabling further checks, return values: error_return: %i, TempValue: %s", error_return, TempValue);
@@ -2402,8 +2403,9 @@ bool LX200_OnStep::ReadScopeStatus()
 
     if (TMCDrivers) {
         i = getCommandSingleCharErrorOrLongResponse(PortFD, TempValue, ":GXU1#"); // Axis1
-        if (i == -4  && TempValue[0] == '0' ) {
+        if ((i == -4  && TempValue[0] == '0') || (TempValue[0] == '0' && TempValue[1] == '\0' ) ) {
             IUSaveText(&OnstepStat[9], "TMC Reporting not detected, Axis 1");
+            LOG_DEBUG("TMC Reportint Not detected on Axis 1");
             TMCDrivers = false;
         } else {
             if (i > 0 ) { 
@@ -2418,8 +2420,9 @@ bool LX200_OnStep::ReadScopeStatus()
             }
         }
         i = getCommandSingleCharErrorOrLongResponse(PortFD, TempValue, ":GXU2#"); // Axis1
-        if (i == -4  && TempValue[0] == '0'  ) {
+        if ((i == -4  && TempValue[0] == '0') || (TempValue[0] == '0' && use_checksum_commands )) {
             IUSaveText(&OnstepStat[10], "TMC Reporting not detected, Axis 2");
+            LOG_DEBUG("TMC Reportint Not detected on Axis 2");
             TMCDrivers = false;
         } else {
             if (i > 0 ) { 
@@ -2565,32 +2568,111 @@ int LX200_OnStep::getCommandSingleCharResponse(int fd, char *data, const char *c
     return 0;
 }
 
+
+
 int LX200_OnStep::getCommandSingleCharErrorOrLongResponse(int fd, char *data, const char *cmd)
 {
     char *term;
     int error_type;
     int nbytes_write = 0, nbytes_read = 0;
     int timeout = 1;
+    char checksummed_command[RB_MAX_LEN] = {0};
+    uint8_t checksum_sent=0;
+    char checksummed_response[RB_MAX_LEN] = {0};
+    char current_sequence[2] = {0};  //Used to compare to make sure the sequence response is right in function.
+    int attempts = 1; //Will try to resend command, if it fails,  
+    strncpy(checksummed_command, cmd, RB_MAX_LEN);
     
-    DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
+    if (use_checksum_commands) {
+        char *in_term = strchr(checksummed_command, '#'); //temporarily remove
+        if (in_term)
+            *in_term = '\0';
+        int length = strlen(checksummed_command);
+        for (int i=1; i <= length ; i++)
+        {
+            checksum_sent += checksummed_command[i];
+        }
+        //NOTE: Uncommenting the next line WILL CAUSE CHECKSUMS TO FAIL FOR TESTING
+//         checksum_sent += 1;
+        if (length > RB_MAX_LEN-5) {
+            LOG_ERROR("Command passed to getCommandSingleCharErrorOrLongResponse to long for buffer, which should be way longer than any command");
+            return -200; //Shouldn't ever get triggered, but we don't want overflows!)
+        }
+        char* current_end = checksummed_command + sizeof(char) * length;
+        char checksum_sent_str[3] = {0};
+        sprintf(current_end,"%02X",checksum_sent);
+        sprintf(checksum_sent_str,"%02X",checksum_sent);
+        current_end += 2; //advance to the \0
+        sprintf(current_end, "%01X", checksum_sequence);
+        sprintf(current_sequence, "%01X", checksum_sequence);
+        checksum_sequence++;
+        if (checksum_sequence > 9) checksum_sequence = 0;
+        current_end += 1; //advance to the \0
+        char term_string[2] = "#";
+        strncpy(current_end, "#", 2);
+        checksummed_command[0]=';';
+        LOGF_DEBUG("Command: %s checksummed to %s, calculated_checksum %s, sequence %s", cmd, checksummed_command, checksum_sent_str, current_sequence);
+    } else {
+        DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
+    }
     
     /* Add mutex */
     std::unique_lock<std::mutex> guard(lx200CommsLock);
     
-    if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
-        return error_type;
-    
-    error_type = tty_read_section(fd, data, '#', timeout, &nbytes_read);
-    tcflush(fd, TCIFLUSH);
-    
+    while (attempts > 0) {
+        attempts--;
+        if ((error_type = tty_write_string(fd, checksummed_command, &nbytes_write)) != TTY_OK)
+            return error_type;
+        
+        error_type = tty_read_section(fd, checksummed_response, '#', timeout, &nbytes_read);
+        tcflush(fd, TCIFLUSH);
+        
+        DEBUGF(DBG_SCOPE, "RES <%s>", checksummed_response);
+        //TODO: Replace data with checksummed_response
+        term = strchr(checksummed_response, '#');
+        if (term)
+            *term = '\0';
+        if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
+            checksummed_response[nbytes_read] = '\0';
 
-    
-    term = strchr(data, '#');
-    if (term)
-        *term = '\0';
-    if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
-        data[nbytes_read] = '\0';
-    
+        if(use_checksum_commands)
+        {
+            //Check and strip checksum from response
+            if (!strncmp("CK_FAILS", checksummed_response, 8)) {
+                //TODO: Handle retransmission
+                //Current, if it's enabled, set 
+                LOGF_WARN("Command: %s, Response: %s", checksummed_command, checksummed_response);
+                if (attempts == 0) {
+                    LOG_ERROR("Got an unhandled checksum failure back");
+                    return -201; //Checksum failed, retransmit;
+                }
+            } else {
+                int length = strlen(checksummed_response);
+                
+                uint8_t calculated_checksum = 0;
+                for (int i = 0; i < length - 3; i++) {
+                    calculated_checksum += checksummed_response[i];
+                }
+                char calculated_checksum_str[3] = {0};
+                sprintf(calculated_checksum_str, "%02X", calculated_checksum);
+        //         if (strcmp(calculated_checksum_str, checksummed_response))
+                if (calculated_checksum_str[0] == checksummed_response[length-3] && calculated_checksum_str[1] == checksummed_response[length-2] && checksummed_response [length-1] == current_sequence[0] )
+                {
+                    checksummed_response[length-3] = '\0';
+                    strncpy(data, checksummed_response, length-2);
+                } else {
+                    LOGF_WARN("Got bad checksum response: Reply {%s} (# stripped) checksum {%s}, sequence {%s}", checksummed_response, calculated_checksum_str, current_sequence);
+                    if (attempts == 0) {
+                        LOGF_ERROR("ERROR on checksums response on command: %s, Check connection & logs", checksummed_command);
+                        return -202;
+                    }
+                }
+            }
+        } else {
+            strncpy(data, checksummed_response, RB_MAX_LEN);
+        }
+    }
+        
     DEBUGF(DBG_SCOPE, "RES <%s>", data);
 
     if (error_type != TTY_OK) {
@@ -3751,7 +3833,7 @@ void LX200_OnStep::Init_Outputs()
         if(configured[i-1]=='1') // is Feature is configured
         {
         sprintf(getoutp, ":GXY%d#", i);
-            getCommandString(PortFD, port_name, getoutp);
+            getCommandSingleCharErrorOrLongResponse(PortFD, port_name, getoutp);
             for(k=0;k<strlen(port_name);k++)    // remove feature type
             {
                 if(port_name[k]==',') port_name[k]='_';
