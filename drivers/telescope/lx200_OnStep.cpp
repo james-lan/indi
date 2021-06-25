@@ -2608,7 +2608,6 @@ int LX200_OnStep::getCommandSingleCharErrorOrLongResponse(int fd, char *data, co
         checksum_sequence++;
         if (checksum_sequence > 9) checksum_sequence = 0;
         current_end += 1; //advance to the \0
-        char term_string[2] = "#";
         strncpy(current_end, "#", 2);
         checksummed_command[0]=';';
         LOGF_DEBUG("Command: %s checksummed to %s, calculated_checksum %s, sequence %s", cmd, checksummed_command, checksum_sent_str, current_sequence);
