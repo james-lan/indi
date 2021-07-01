@@ -154,6 +154,15 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         virtual bool saveConfigItems(FILE *fp) override;
         virtual void Init_Outputs();
 
+        //Where available use checksummed command format
+        // =false use: Traditional LX200 command framing ":#" c=command, p=parameter...
+        // :ccppppppp#
+        // =true use: OnStep checksum LX200 command framing ";#" c=command, p=parameter, CC=checksum, S=sequence check...
+        // ;ccpppppppCCS#
+        bool use_checksum_commands = true;
+        // The sequence (S) above will be limited for readability to 0-9
+        int checksum_sequence = 0;
+
         //Mount information
         int OSMountType = 0;
         /*  0 = EQ mount  (Presumed default for most things.)
@@ -257,6 +266,7 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         IText OnstepStat[11] {};
         
         bool TMCDrivers = true; //Set to false if it doesn't detect TMC_SPI reporting. (Small delay on connection/first update)
+        bool OSHighPrecision = false;
 
         // Focuser controls
         // Focuser 1
@@ -403,7 +413,7 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
     private:
         int currentCatalog;
         int currentSubCatalog;
-        bool FirstRead = true;
+
 
 
 };
