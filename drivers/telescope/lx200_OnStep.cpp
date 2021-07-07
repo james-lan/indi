@@ -1881,8 +1881,11 @@ bool LX200_OnStep::ReadScopeStatus()
             
             if (strstr(OSStat, "p"))
             {
-                SetParked(false);   //always override TrackState after calling SetParked
-                TrackState = SCOPE_TRACKING;
+                if (isParked())
+                {
+                    SetParked(false);   //always override TrackState after calling SetParked
+                    TrackState = SCOPE_TRACKING;
+                }
                 if (strstr(OSStat, "nN"))
                 {
                     IUSaveText(&OnstepStat[1], "Idle");
