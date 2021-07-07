@@ -1838,12 +1838,12 @@ bool LX200_OnStep::ReadScopeStatus()
             strcpy(OldOSStat, OSStat);
 
             IUSaveText(&OnstepStat[0], OSStat);
-            if (strstr(OSStat, "n") && strstr(OSStat, "N"))
+            if (strstr(OSStat, "nN"))
             {
                 IUSaveText(&OnstepStat[1], "Idle");
                 TrackState = SCOPE_IDLE;
             }
-            if (strstr(OSStat, "n") && !strstr(OSStat, "N"))
+            if (!strstr(OSStat, "N"))    
             {
                 IUSaveText(&OnstepStat[1], "Slewing");
                 TrackState = SCOPE_SLEWING;
@@ -1853,7 +1853,37 @@ bool LX200_OnStep::ReadScopeStatus()
                 IUSaveText(&OnstepStat[1], "Tracking");
                 TrackState = SCOPE_TRACKING;
             }
-
+            if (strstr(OSStat, "I"))
+            {
+                TrackState = SCOPE_PARKING;
+                IUSaveText(&OnstepStat[1], "Parking");
+                IUSaveText(&OnstepStat[3], "Park in Progress");
+            }
+            if (strstr(OSStat, "P"))
+            {
+                SetParked(true);
+                TrackState = SCOPE_PARKED;
+                IUSaveText(&OnstepStat[1], "Parked");
+                IUSaveText(&OnstepStat[3], "Parked");
+            }
+            if (strstr(OSStat, "F"))
+            {
+                SetParked(false);
+                TrackState=SCOPE_IDLE;
+                IUSaveText(&OnstepStat[1], "Idle");
+                IUSaveText(&OnstepStat[3], "Parking Failed");
+            }
+            
+            if (strstr(OSStat, "p"))
+            {
+                SetParked(false);
+                if (strstr(OSStat, "nN"))
+                {
+                    IUSaveText(&OnstepStat[1], "Idle");
+                    TrackState = SCOPE_IDLE;
+                }
+                IUSaveText(&OnstepStat[3], "UnParked");
+            }
             // ============= Refractoring
             if ((strstr(OSStat, "r") || strstr(OSStat, "t"))) //On, either refractory only (r) or full (t)
             {
@@ -1880,39 +1910,6 @@ bool LX200_OnStep::ReadScopeStatus()
                 IUSaveText(&OnstepStat[2], "Refractoring Off");
                 IUSaveText(&OnstepStat[8], "N/A");
             }
-
-
-            // ============= Parkstatus
-            if (strstr(OSStat, "P"))
-            {
-                SetParked(true); //defaults to TrackState=SCOPE_PARKED
-                TrackState = SCOPE_PARKED;
-                IUSaveText(&OnstepStat[3], "Parked");
-            }
-            if (strstr(OSStat, "F"))
-            {
-                SetParked(false); // defaults to TrackState=SCOPE_IDLE
-                TrackState=SCOPE_IDLE;
-                IUSaveText(&OnstepStat[3], "Parking Failed");
-            }
-            if (strstr(OSStat, "I"))
-            {
-                SetParked(false); //defaults to TrackState=SCOPE_IDLE but we want
-                TrackState = SCOPE_PARKING;
-                IUSaveText(&OnstepStat[3], "Park in Progress");
-            }
-            if (strstr(OSStat, "p"))
-            {
-                SetParked(false); //defaults to TrackState=SCOPE_IDLE but we want
-                if (strstr(OSStat, "nN"))   // azwing need to detect if unparked idle or tracking
-                {
-                    IUSaveText(&OnstepStat[1], "Idle");
-                    TrackState = SCOPE_IDLE;
-                }
-                else TrackState = SCOPE_TRACKING;
-                IUSaveText(&OnstepStat[3], "UnParked");
-            }
-            // ============= End Parkstatus
 
             //if (strstr(OSStat,"H")) { IUSaveText(&OnstepStat[3],"At Home"); }
             if (strstr(OSStat, "H") && strstr(OSStat, "P"))
