@@ -43,7 +43,6 @@
 
 extern std::mutex lx200CommsLock;
 
-INDI::Telescope::TelescopeStatus myTrackState; 
 
 LX200_OnStep::LX200_OnStep() : LX200Generic(), WI(this), RotatorInterface(this)
 {
@@ -1813,8 +1812,6 @@ bool LX200_OnStep::ReadScopeStatus()
     char TempValue2[RB_MAX_LEN];
     int i;
     Errors Lasterror = ERR_NONE;
-
-    TrackState = myTrackState;
     
     if (isSimulation()) //if Simulation is selected
     {
@@ -1893,7 +1890,6 @@ bool LX200_OnStep::ReadScopeStatus()
                 }
                 IUSaveText(&OnstepStat[3], "UnParked");
             }
-            myTrackState = TrackState;
             
             // ============= Refractoring
             if ((strstr(OSStat, "r") || strstr(OSStat, "t"))) //On, either refractory only (r) or full (t)
