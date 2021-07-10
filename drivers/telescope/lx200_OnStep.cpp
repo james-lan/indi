@@ -1870,9 +1870,10 @@ bool LX200_OnStep::ReadScopeStatus()
             }
             if (strstr(OSStat, "F"))
             {
-                SetParked(false);//always override TrackState after calling SetParked
-                TrackState=SCOPE_IDLE;
-                IUSaveText(&OnstepStat[1], "Idle");
+                // Not changing anything in TrackState
+                //SetParked(false);//always override TrackState after calling SetParked
+                //TrackState=SCOPE_IDLE;
+                //IUSaveText(&OnstepStat[1], "Idle");
                 IUSaveText(&OnstepStat[3], "Parking Failed");
             }
             
