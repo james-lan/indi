@@ -43,7 +43,6 @@
 
 extern std::mutex lx200CommsLock;
 
-
 LX200_OnStep::LX200_OnStep() : LX200Generic(), WI(this), RotatorInterface(this)
 {
     currentCatalog    = LX200_STAR_C;
@@ -1852,7 +1851,7 @@ bool LX200_OnStep::ReadScopeStatus()
             }
             if (strstr(OSStat, "N") && !strstr(OSStat, "n"))
             {
-                TrackState = SCOPE_TRACKING;                
+                TrackState = SCOPE_TRACKING;
                 IUSaveText(&OnstepStat[1], "Tracking");
             }
             if (strstr(OSStat, "I"))
@@ -1870,10 +1869,10 @@ bool LX200_OnStep::ReadScopeStatus()
             }
             if (strstr(OSStat, "F"))
             {
-                // Not changing anything in TrackState
-                //SetParked(false);//always override TrackState after calling SetParked
-                //TrackState=SCOPE_IDLE;
-                //IUSaveText(&OnstepStat[1], "Idle");
+                if (isParked())
+                {
+                    SetParked(false);//always override TrackState after calling SetParked
+                }
                 IUSaveText(&OnstepStat[3], "Parking Failed");
             }
             
