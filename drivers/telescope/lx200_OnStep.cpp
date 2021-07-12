@@ -1832,7 +1832,7 @@ bool LX200_OnStep::ReadScopeStatus()
     {
         //Fall back to :GU parsing
 #endif
-        getCommandString(PortFD, OSStat, ":GU#"); // :GU# returns a string containg controller status
+         getCommandString(PortFD, OSStat, ":GU#"); // :GU# returns a string containg controller status
         if (strcmp(OSStat, OldOSStat) != 0) //if status changed
         {
             // ============= Telescope Status
@@ -1844,7 +1844,7 @@ bool LX200_OnStep::ReadScopeStatus()
                 TrackState = SCOPE_IDLE;
                 IUSaveText(&OnstepStat[1], "Idle");
             }
-            if (!strstr(OSStat, "N"))    
+            if (!strstr(OSStat, "N") && !strstr(OSStat, "I"))
             {
                 TrackState = SCOPE_SLEWING;
                 IUSaveText(&OnstepStat[1], "Slewing");
