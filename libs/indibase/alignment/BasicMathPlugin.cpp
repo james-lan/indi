@@ -54,32 +54,24 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
     /// triangular facet of the hull.
     switch (SyncPoints.size())
     {
-        // JM 2021-07-04: No Transformation required.
         case 0:
+            // Not sure whether to return false or true here
             return true;
 
-        // JM 2021-07-04: For 1 point, it should be direct reciporical transformation.
         case 1:
         {
             AlignmentDatabaseEntry &Entry1 = SyncPoints[0];
             INDI::IEquatorialCoordinates RaDec;
             INDI::IHorizontalCoordinates ActualSyncPoint1;
-            TelescopeDirectionVector ActualDirectionCosine1;
             IGeographicCoordinates Position;
             if (!pInMemoryDatabase->GetDatabaseReferencePosition(Position))
                 return false;
             RaDec.declination = Entry1.Declination;
             RaDec.rightascension = Entry1.RightAscension;
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                EquatorialToHorizontal(&RaDec, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
-                // Now express this coordinate as a normalised direction vector (a.k.a direction cosines)
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
-            }
-            else
-            {
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec);
-            }
+            EquatorialToHorizontal(&RaDec, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
+            // Now express this coordinate as a normalised direction vector (a.k.a direction cosines)
+            TelescopeDirectionVector ActualDirectionCosine1 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
             TelescopeDirectionVector DummyActualDirectionCosine2;
             TelescopeDirectionVector DummyApparentDirectionCosine2;
             TelescopeDirectionVector DummyActualDirectionCosine3;
@@ -97,22 +89,22 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
                 case NORTH_CELESTIAL_POLE:
                 {
                     INDI::IEquatorialCoordinates DummyRaDec;
-                    //INDI::IHorizontalCoordinates DummyAltAz;
+                    INDI::IHorizontalCoordinates DummyAltAz;
                     DummyRaDec.rightascension  = 0.0;
                     DummyRaDec.declination = 90.0;
-                    //EquatorialToHorizontal(&DummyRaDec, &Position, ln_get_julian_from_sys(), &DummyAltAz);
-                    DummyActualDirectionCosine2   = TelescopeDirectionVectorFromEquatorialCoordinates(DummyRaDec);
+                    EquatorialToHorizontal(&DummyRaDec, &Position, ln_get_julian_from_sys(), &DummyAltAz);
+                    DummyActualDirectionCosine2   = TelescopeDirectionVectorFromAltitudeAzimuth(DummyAltAz);
                     DummyApparentDirectionCosine2 = DummyActualDirectionCosine2;
                     break;
                 }
                 case SOUTH_CELESTIAL_POLE:
                 {
                     INDI::IEquatorialCoordinates DummyRaDec;
-                    //INDI::IHorizontalCoordinates DummyAltAz;
+                    INDI::IHorizontalCoordinates DummyAltAz;
                     DummyRaDec.rightascension  = 0.0;
                     DummyRaDec.declination = -90.0;
-                    //EquatorialToHorizontal(&DummyRaDec, &Position, ln_get_julian_from_sys(), &DummyAltAz);
-                    DummyActualDirectionCosine2   = TelescopeDirectionVectorFromEquatorialCoordinates(DummyRaDec);
+                    EquatorialToHorizontal(&DummyRaDec, &Position, ln_get_julian_from_sys(), &DummyAltAz);
+                    DummyActualDirectionCosine2   = TelescopeDirectionVectorFromAltitudeAzimuth(DummyAltAz);
                     DummyApparentDirectionCosine2 = DummyActualDirectionCosine2;
                     break;
                 }
@@ -132,10 +124,10 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
             // First compute local horizontal coordinates for the two sync points
             AlignmentDatabaseEntry &Entry1 = SyncPoints[0];
             AlignmentDatabaseEntry &Entry2 = SyncPoints[1];
+            INDI::IHorizontalCoordinates ActualSyncPoint1;
+            INDI::IHorizontalCoordinates ActualSyncPoint2;
             INDI::IEquatorialCoordinates RaDec1;
             INDI::IEquatorialCoordinates RaDec2;
-            TelescopeDirectionVector ActualDirectionCosine1;
-            TelescopeDirectionVector ActualDirectionCosine2;
             RaDec1.declination = Entry1.Declination;
             RaDec1.rightascension  = Entry1.RightAscension;
             RaDec2.declination = Entry2.Declination;
@@ -143,22 +135,14 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
             IGeographicCoordinates Position { 0, 0, 0 };
             if (!pInMemoryDatabase->GetDatabaseReferencePosition(Position))
                 return false;
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                INDI::IHorizontalCoordinates ActualSyncPoint1;
-                INDI::IHorizontalCoordinates ActualSyncPoint2;
-                EquatorialToHorizontal(&RaDec1, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
-                EquatorialToHorizontal(&RaDec2, &Position, Entry2.ObservationJulianDate, &ActualSyncPoint2);
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
-                ActualDirectionCosine2 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
-            }
-            else
-            {
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec1);
-                ActualDirectionCosine2 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec2);
-            }
+            EquatorialToHorizontal(&RaDec1, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
+            EquatorialToHorizontal(&RaDec2, &Position, Entry2.ObservationJulianDate, &ActualSyncPoint2);
 
             // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
+            TelescopeDirectionVector ActualDirectionCosine1 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
+            TelescopeDirectionVector ActualDirectionCosine2 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
             TelescopeDirectionVector DummyActualDirectionCosine3;
             TelescopeDirectionVector DummyApparentDirectionCosine3;
             DummyActualDirectionCosine3 = ActualDirectionCosine1 * ActualDirectionCosine2;
@@ -180,8 +164,12 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
             AlignmentDatabaseEntry &Entry1 = SyncPoints[0];
             AlignmentDatabaseEntry &Entry2 = SyncPoints[1];
             AlignmentDatabaseEntry &Entry3 = SyncPoints[2];
-            INDI::IEquatorialCoordinates RaDec1, RaDec2, RaDec3;
-            TelescopeDirectionVector ActualDirectionCosine1, ActualDirectionCosine2, ActualDirectionCosine3;
+            INDI::IHorizontalCoordinates ActualSyncPoint1;
+            INDI::IHorizontalCoordinates ActualSyncPoint2;
+            INDI::IHorizontalCoordinates ActualSyncPoint3;
+            INDI::IEquatorialCoordinates RaDec1;
+            INDI::IEquatorialCoordinates RaDec2;
+            INDI::IEquatorialCoordinates RaDec3;
             RaDec1.declination = Entry1.Declination;
             RaDec1.rightascension  = Entry1.RightAscension;
             RaDec2.declination = Entry2.Declination;
@@ -191,26 +179,17 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
             IGeographicCoordinates Position { 0, 0, 0 };
             if (!pInMemoryDatabase->GetDatabaseReferencePosition(Position))
                 return false;
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                INDI::IHorizontalCoordinates ActualSyncPoint1;
-                INDI::IHorizontalCoordinates ActualSyncPoint2;
-                INDI::IHorizontalCoordinates ActualSyncPoint3;
-                EquatorialToHorizontal(&RaDec1, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
-                EquatorialToHorizontal(&RaDec2, &Position, Entry2.ObservationJulianDate, &ActualSyncPoint2);
-                EquatorialToHorizontal(&RaDec3, &Position, Entry3.ObservationJulianDate, &ActualSyncPoint3);
+            EquatorialToHorizontal(&RaDec1, &Position, Entry1.ObservationJulianDate, &ActualSyncPoint1);
+            EquatorialToHorizontal(&RaDec2, &Position, Entry2.ObservationJulianDate, &ActualSyncPoint2);
+            EquatorialToHorizontal(&RaDec3, &Position, Entry3.ObservationJulianDate, &ActualSyncPoint3);
 
-                // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
-                ActualDirectionCosine2 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
-                ActualDirectionCosine3 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
-            }
-            else
-            {
-                ActualDirectionCosine1 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec1);
-                ActualDirectionCosine2 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec2);
-                ActualDirectionCosine3 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec3);
-            }
+            // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
+            TelescopeDirectionVector ActualDirectionCosine1 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
+            TelescopeDirectionVector ActualDirectionCosine2 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
+            TelescopeDirectionVector ActualDirectionCosine3 =
+                TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
 
             CalculateTransformMatrices(ActualDirectionCosine1, ActualDirectionCosine2, ActualDirectionCosine3,
                                        Entry1.TelescopeDirection, Entry2.TelescopeDirection, Entry3.TelescopeDirection,
@@ -239,20 +218,14 @@ bool BasicMathPlugin::Initialise(InMemoryDatabase *pInMemoryDatabase)
                     Itr != SyncPoints.end(); Itr++)
             {
                 INDI::IEquatorialCoordinates RaDec;
-                TelescopeDirectionVector ActualDirectionCosine;
+                INDI::IHorizontalCoordinates ActualSyncPoint;
                 RaDec.declination = (*Itr).Declination;
+                // libnova works in decimal degrees so conversion is needed here
                 RaDec.rightascension = (*Itr).RightAscension;
-                if (ApproximateMountAlignment == ZENITH)
-                {
-                    INDI::IHorizontalCoordinates ActualSyncPoint;
-                    EquatorialToHorizontal(&RaDec, &Position, (*Itr).ObservationJulianDate, &ActualSyncPoint);
-                    // Now express this coordinate as normalised direction vectors (a.k.a direction cosines)
-                    ActualDirectionCosine = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint);
-                }
-                else
-                {
-                    ActualDirectionCosine = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec);
-                }
+                EquatorialToHorizontal(&RaDec, &Position, (*Itr).ObservationJulianDate, &ActualSyncPoint);
+                // Now express this coordinate as normalised direction vectors (a.k.a direction cosines)
+                TelescopeDirectionVector ActualDirectionCosine =
+                    TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint);
                 ActualDirectionCosines.push_back(ActualDirectionCosine);
                 ActualConvexHull.MakeNewVertex(ActualDirectionCosine.x, ActualDirectionCosine.y,
                                                ActualDirectionCosine.z, VertexNumber);
@@ -363,13 +336,20 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
         TelescopeDirectionVector &ApparentTelescopeDirectionVector)
 {
     INDI::IEquatorialCoordinates ActualRaDec;
+    INDI::IHorizontalCoordinates ActualAltAz;
     ActualRaDec.rightascension  = RightAscension;
     ActualRaDec.declination = Declination;
     IGeographicCoordinates Position { 0, 0, 0 };
 
-    // Should check that this the same as the current observing position
-    if ((nullptr == pInMemoryDatabase) || !pInMemoryDatabase->GetDatabaseReferencePosition(Position))
+    if ((nullptr == pInMemoryDatabase) ||
+            !pInMemoryDatabase->GetDatabaseReferencePosition(
+                Position)) // Should check that this the same as the current observing position
         return false;
+
+    EquatorialToHorizontal(&ActualRaDec, &Position, ln_get_julian_from_sys() + JulianOffset, &ActualAltAz);
+    ASSDEBUGF("Celestial to telescope - Actual Az %lf Alt %lf", ActualAltAz.azimuth, ActualAltAz.altitude);
+
+    TelescopeDirectionVector ActualVector = TelescopeDirectionVectorFromAltitudeAzimuth(ActualAltAz);
 
     InMemoryDatabase::AlignmentDatabaseType &SyncPoints = pInMemoryDatabase->GetAlignmentDatabase();
     switch (SyncPoints.size())
@@ -377,24 +357,23 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
         case 0:
         {
             // 0 sync points
+            ApparentTelescopeDirectionVector = ActualVector;
+
             switch (ApproximateMountAlignment)
             {
                 case ZENITH:
-                    INDI::IHorizontalCoordinates ActualAltAz;
-                    EquatorialToHorizontal(&ActualRaDec, &Position, ln_get_julian_from_sys() + JulianOffset, &ActualAltAz);
-                    ApparentTelescopeDirectionVector = TelescopeDirectionVectorFromAltitudeAzimuth(ActualAltAz);
-                    ASSDEBUGF("Celestial to telescope - Actual Az %lf Alt %lf", ActualAltAz.azimuth, ActualAltAz.altitude);
                     break;
 
                 case NORTH_CELESTIAL_POLE:
-                // Rotate the TDV coordinate system clockwise (negative) around the y axis by 90 minus
-                // the (positive)observatory latitude. The vector itself is rotated anticlockwise
-                //ApparentTelescopeDirectionVector.RotateAroundY(Position.latitude - 90.0);
+                    // Rotate the TDV coordinate system clockwise (negative) around the y axis by 90 minus
+                    // the (positive)observatory latitude. The vector itself is rotated anticlockwise
+                    ApparentTelescopeDirectionVector.RotateAroundY(Position.latitude - 90.0);
+                    break;
+
                 case SOUTH_CELESTIAL_POLE:
                     // Rotate the TDV coordinate system anticlockwise (positive) around the y axis by 90 plus
                     // the (negative)observatory latitude. The vector itself is rotated clockwise
-                    //ApparentTelescopeDirectionVector.RotateAroundY(Position.latitude + 90.0);
-                    ApparentTelescopeDirectionVector = TelescopeDirectionVectorFromEquatorialCoordinates(ActualRaDec);
+                    ApparentTelescopeDirectionVector.RotateAroundY(Position.latitude + 90.0);
                     break;
             }
             break;
@@ -403,17 +382,6 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
         case 2:
         case 3:
         {
-            TelescopeDirectionVector ActualVector;
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                INDI::IHorizontalCoordinates ActualAltAz;
-                EquatorialToHorizontal(&ActualRaDec, &Position, ln_get_julian_from_sys() + JulianOffset, &ActualAltAz);
-                ActualVector = TelescopeDirectionVectorFromAltitudeAzimuth(ActualAltAz);
-            }
-            else
-            {
-                ActualVector = TelescopeDirectionVectorFromEquatorialCoordinates(ActualRaDec);
-            }
             gsl_vector *pGSLActualVector = gsl_vector_alloc(3);
             gsl_vector_set(pGSLActualVector, 0, ActualVector.x);
             gsl_vector_set(pGSLActualVector, 1, ActualVector.y);
@@ -431,18 +399,6 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
 
         default:
         {
-            TelescopeDirectionVector ActualVector;
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                INDI::IHorizontalCoordinates ActualAltAz;
-                EquatorialToHorizontal(&ActualRaDec, &Position, ln_get_julian_from_sys() + JulianOffset, &ActualAltAz);
-                ActualVector = TelescopeDirectionVectorFromAltitudeAzimuth(ActualAltAz);
-            }
-            else
-            {
-                ActualVector = TelescopeDirectionVectorFromEquatorialCoordinates(ActualRaDec);
-            }
-
             gsl_matrix *pTransform;
             gsl_matrix *pComputedTransform = nullptr;
             // Scale the actual telescope direction vector to make sure it traverses the unit sphere.
@@ -492,19 +448,12 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
                             Itr != SyncPoints.end(); Itr++)
                     {
                         INDI::IEquatorialCoordinates RaDec;
-                        TelescopeDirectionVector ActualDirectionCosine;
+                        INDI::IHorizontalCoordinates ActualPoint;
                         RaDec.rightascension  = (*Itr).RightAscension;
                         RaDec.declination = (*Itr).Declination;
-                        if (ApproximateMountAlignment == ZENITH)
-                        {
-                            INDI::IHorizontalCoordinates ActualPoint;
-                            EquatorialToHorizontal(&RaDec, &Position, (*Itr).ObservationJulianDate, &ActualPoint);
-                            ActualDirectionCosine = TelescopeDirectionVectorFromAltitudeAzimuth(ActualPoint);
-                        }
-                        else
-                        {
-                            ActualDirectionCosine = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec);
-                        }
+                        EquatorialToHorizontal(&RaDec, &Position, (*Itr).ObservationJulianDate, &ActualPoint);
+                        TelescopeDirectionVector ActualDirectionCosine =
+                            TelescopeDirectionVectorFromAltitudeAzimuth(ActualPoint);
                         NearestMap[(ActualDirectionCosine - ActualVector).Length()] = &(*Itr);
                     }
                     // First compute local horizontal coordinates for the three sync points
@@ -514,40 +463,29 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
                     const AlignmentDatabaseEntry *pEntry2 = (*Nearest).second;
                     Nearest++;
                     const AlignmentDatabaseEntry *pEntry3 = (*Nearest).second;
+                    INDI::IHorizontalCoordinates ActualSyncPoint1;
+                    INDI::IHorizontalCoordinates ActualSyncPoint2;
+                    INDI::IHorizontalCoordinates ActualSyncPoint3;
                     INDI::IEquatorialCoordinates RaDec1;
                     INDI::IEquatorialCoordinates RaDec2;
                     INDI::IEquatorialCoordinates RaDec3;
-                    TelescopeDirectionVector ActualDirectionCosine1;
-                    TelescopeDirectionVector ActualDirectionCosine2;
-                    TelescopeDirectionVector ActualDirectionCosine3;
                     RaDec1.declination = pEntry1->Declination;
                     RaDec1.rightascension  = pEntry1->RightAscension;
                     RaDec2.declination = pEntry2->Declination;
                     RaDec2.rightascension  = pEntry2->RightAscension;
                     RaDec3.declination = pEntry3->Declination;
                     RaDec3.rightascension = pEntry3->RightAscension;
+                    EquatorialToHorizontal(&RaDec1, &Position, pEntry1->ObservationJulianDate, &ActualSyncPoint1);
+                    EquatorialToHorizontal(&RaDec2, &Position, pEntry2->ObservationJulianDate, &ActualSyncPoint2);
+                    EquatorialToHorizontal(&RaDec3, &Position, pEntry3->ObservationJulianDate, &ActualSyncPoint3);
 
-                    if (ApproximateMountAlignment == ZENITH)
-                    {
-                        INDI::IHorizontalCoordinates ActualSyncPoint1;
-                        INDI::IHorizontalCoordinates ActualSyncPoint2;
-                        INDI::IHorizontalCoordinates ActualSyncPoint3;
-                        EquatorialToHorizontal(&RaDec1, &Position, pEntry1->ObservationJulianDate, &ActualSyncPoint1);
-                        EquatorialToHorizontal(&RaDec2, &Position, pEntry2->ObservationJulianDate, &ActualSyncPoint2);
-                        EquatorialToHorizontal(&RaDec3, &Position, pEntry3->ObservationJulianDate, &ActualSyncPoint3);
-
-                        // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
-                        ActualDirectionCosine1 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
-                        ActualDirectionCosine2 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
-                        ActualDirectionCosine3 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
-                    }
-                    else
-                    {
-                        ActualDirectionCosine1 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec1);
-                        ActualDirectionCosine2 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec2);
-                        ActualDirectionCosine3 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec3);
-                    }
-
+                    // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
+                    TelescopeDirectionVector ActualDirectionCosine1 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
+                    TelescopeDirectionVector ActualDirectionCosine2 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
+                    TelescopeDirectionVector ActualDirectionCosine3 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
                     pComputedTransform = gsl_matrix_alloc(3, 3);
                     CalculateTransformMatrices(ActualDirectionCosine1, ActualDirectionCosine2, ActualDirectionCosine3,
                                                pEntry1->TelescopeDirection, pEntry2->TelescopeDirection,
@@ -579,9 +517,9 @@ bool BasicMathPlugin::TransformCelestialToTelescope(const double RightAscension,
         }
     }
 
-    //    INDI::IHorizontalCoordinates ApparentAltAz;
-    //    AltitudeAzimuthFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ApparentAltAz);
-    //    ASSDEBUGF("Celestial to telescope - Apparent Az %lf Alt %lf", ApparentAltAz.azimuth, ApparentAltAz.altitude);
+    INDI::IHorizontalCoordinates ApparentAltAz;
+    AltitudeAzimuthFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ApparentAltAz);
+    ASSDEBUGF("Celestial to telescope - Apparent Az %lf Alt %lf", ApparentAltAz.azimuth, ApparentAltAz.altitude);
 
     return true;
 }
@@ -591,12 +529,12 @@ bool BasicMathPlugin::TransformTelescopeToCelestial(const TelescopeDirectionVect
 {
     IGeographicCoordinates Position;
 
-    //INDI::IHorizontalCoordinates ApparentAltAz;
+    INDI::IHorizontalCoordinates ApparentAltAz;
     INDI::IHorizontalCoordinates ActualAltAz;
     INDI::IEquatorialCoordinates ActualRaDec;
 
-    //    AltitudeAzimuthFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ApparentAltAz);
-    //    ASSDEBUGF("Telescope to celestial - Apparent  Az %lf Alt %lf", ApparentAltAz.azimuth, ApparentAltAz.altitude);
+    AltitudeAzimuthFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ApparentAltAz);
+    ASSDEBUGF("Telescope to celestial - Apparent  Az %lf Alt %lf", ApparentAltAz.azimuth, ApparentAltAz.altitude);
 
     if ((nullptr == pInMemoryDatabase) || !pInMemoryDatabase->GetDatabaseReferencePosition(Position))
     {
@@ -610,29 +548,30 @@ bool BasicMathPlugin::TransformTelescopeToCelestial(const TelescopeDirectionVect
         case 0:
         {
             // 0 sync points
-
+            TelescopeDirectionVector RotatedTDV(ApparentTelescopeDirectionVector);
             switch (ApproximateMountAlignment)
             {
-                // For Alt-Az mounts, get Alt-Az from the telescope direction vector first
-                // Then transform to actual RA/DE
                 case ZENITH:
-                {
-                    ASSDEBUGF("ApparentVector x %lf y %lf z %lf", ApparentTelescopeDirectionVector.x,
-                              ApparentTelescopeDirectionVector.y, ApparentTelescopeDirectionVector.z);
-                    //ASSDEBUGF("ActualVector x %lf y %lf z %lf", RotatedTDV.x, RotatedTDV.y, RotatedTDV.z);
-                    AltitudeAzimuthFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ActualAltAz);
-                    HorizontalToEquatorial(&ActualAltAz, &Position, ln_get_julian_from_sys(), &ActualRaDec);
-                }
-                break;
+                    break;
 
-                // For equatorial mount with zero sync points, just convert back from telescope
-                // direction vector to equatorial coordinates.
                 case NORTH_CELESTIAL_POLE:
+                    // Rotate the TDV coordinate system anticlockwise (positive) around the y axis by 90 minus
+                    // the (positive)observatory latitude. The vector itself is rotated clockwise
+                    RotatedTDV.RotateAroundY(90.0 - Position.latitude);
+                    break;
+
                 case SOUTH_CELESTIAL_POLE:
-                    EquatorialCoordinatesFromTelescopeDirectionVector(ApparentTelescopeDirectionVector, ActualRaDec);
+                    // Rotate the TDV coordinate system clockwise (negative) around the y axis by 90 plus
+                    // the (negative)observatory latitude. The vector itself is rotated anticlockwise
+                    RotatedTDV.RotateAroundY(-90.0 - Position.latitude);
                     break;
             }
-
+            ASSDEBUGF("ApparentVector x %lf y %lf z %lf", ApparentTelescopeDirectionVector.x,
+                      ApparentTelescopeDirectionVector.y, ApparentTelescopeDirectionVector.z);
+            ASSDEBUGF("ActualVector x %lf y %lf z %lf", RotatedTDV.x, RotatedTDV.y, RotatedTDV.z);
+            AltitudeAzimuthFromTelescopeDirectionVector(RotatedTDV, ActualAltAz);
+            HorizontalToEquatorial(&ActualAltAz, &Position, ln_get_julian_from_sys(), &ActualRaDec);
+            // libnova works in decimal degrees so conversion is needed here
             RightAscension = ActualRaDec.rightascension;
             Declination    = ActualRaDec.declination;
             break;
@@ -656,15 +595,8 @@ bool BasicMathPlugin::TransformTelescopeToCelestial(const TelescopeDirectionVect
             ActualTelescopeDirectionVector.y = gsl_vector_get(pGSLActualVector, 1);
             ActualTelescopeDirectionVector.z = gsl_vector_get(pGSLActualVector, 2);
             ActualTelescopeDirectionVector.Normalise();
-            if (ApproximateMountAlignment == ZENITH)
-            {
-                AltitudeAzimuthFromTelescopeDirectionVector(ActualTelescopeDirectionVector, ActualAltAz);
-                HorizontalToEquatorial(&ActualAltAz, &Position, ln_get_julian_from_sys(), &ActualRaDec);
-            }
-            else
-            {
-                EquatorialCoordinatesFromTelescopeDirectionVector(ActualTelescopeDirectionVector, ActualRaDec);
-            }
+            AltitudeAzimuthFromTelescopeDirectionVector(ActualTelescopeDirectionVector, ActualAltAz);
+            HorizontalToEquatorial(&ActualAltAz, &Position, ln_get_julian_from_sys(), &ActualRaDec);
             RightAscension = ActualRaDec.rightascension;
             Declination    = ActualRaDec.declination;
             gsl_vector_free(pGSLActualVector);
@@ -731,39 +663,29 @@ bool BasicMathPlugin::TransformTelescopeToCelestial(const TelescopeDirectionVect
                     const AlignmentDatabaseEntry *pEntry2 = (*Nearest).second;
                     Nearest++;
                     const AlignmentDatabaseEntry *pEntry3 = (*Nearest).second;
+                    INDI::IHorizontalCoordinates ActualSyncPoint1;
+                    INDI::IHorizontalCoordinates ActualSyncPoint2;
+                    INDI::IHorizontalCoordinates ActualSyncPoint3;
                     INDI::IEquatorialCoordinates RaDec1;
                     INDI::IEquatorialCoordinates RaDec2;
                     INDI::IEquatorialCoordinates RaDec3;
-                    TelescopeDirectionVector ActualDirectionCosine1;
-                    TelescopeDirectionVector ActualDirectionCosine2;
-                    TelescopeDirectionVector ActualDirectionCosine3;
                     RaDec1.declination = pEntry1->Declination;
-                    RaDec1.rightascension  = pEntry1->RightAscension;
+                    RaDec1.rightascension  = pEntry1->RightAscension * 360.0 / 24.0;
                     RaDec2.declination = pEntry2->Declination;
-                    RaDec2.rightascension  = pEntry2->RightAscension;
+                    RaDec2.rightascension  = pEntry2->RightAscension * 360.0 / 24.0;
                     RaDec3.declination = pEntry3->Declination;
-                    RaDec3.rightascension = pEntry3->RightAscension;
+                    RaDec3.rightascension = pEntry3->RightAscension * 360.0 / 24.0;
+                    EquatorialToHorizontal(&RaDec1, &Position, pEntry1->ObservationJulianDate, &ActualSyncPoint1);
+                    EquatorialToHorizontal(&RaDec2, &Position, pEntry2->ObservationJulianDate, &ActualSyncPoint2);
+                    EquatorialToHorizontal(&RaDec3, &Position, pEntry3->ObservationJulianDate, &ActualSyncPoint3);
 
-                    if (ApproximateMountAlignment == ZENITH)
-                    {
-                        INDI::IHorizontalCoordinates ActualSyncPoint1;
-                        INDI::IHorizontalCoordinates ActualSyncPoint2;
-                        INDI::IHorizontalCoordinates ActualSyncPoint3;
-                        EquatorialToHorizontal(&RaDec1, &Position, pEntry1->ObservationJulianDate, &ActualSyncPoint1);
-                        EquatorialToHorizontal(&RaDec2, &Position, pEntry2->ObservationJulianDate, &ActualSyncPoint2);
-                        EquatorialToHorizontal(&RaDec3, &Position, pEntry3->ObservationJulianDate, &ActualSyncPoint3);
-
-                        // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
-                        ActualDirectionCosine1 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
-                        ActualDirectionCosine2 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
-                        ActualDirectionCosine3 = TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
-                    }
-                    else
-                    {
-                        ActualDirectionCosine1 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec1);
-                        ActualDirectionCosine2 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec2);
-                        ActualDirectionCosine3 = TelescopeDirectionVectorFromEquatorialCoordinates(RaDec3);
-                    }
+                    // Now express these coordinates as normalised direction vectors (a.k.a direction cosines)
+                    TelescopeDirectionVector ActualDirectionCosine1 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint1);
+                    TelescopeDirectionVector ActualDirectionCosine2 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint2);
+                    TelescopeDirectionVector ActualDirectionCosine3 =
+                        TelescopeDirectionVectorFromAltitudeAzimuth(ActualSyncPoint3);
                     pComputedTransform = gsl_matrix_alloc(3, 3);
                     CalculateTransformMatrices(pEntry1->TelescopeDirection, pEntry2->TelescopeDirection,
                                                pEntry3->TelescopeDirection, ActualDirectionCosine1,
@@ -801,7 +723,7 @@ bool BasicMathPlugin::TransformTelescopeToCelestial(const TelescopeDirectionVect
             break;
         }
     }
-    //ASSDEBUGF("Telescope to Celestial - Actual Az %lf Alt %lf", ActualAltAz.azimuth, ActualAltAz.altitude);
+    ASSDEBUGF("Telescope to Celestial - Actual Az %lf Alt %lf", ActualAltAz.azimuth, ActualAltAz.altitude);
     return true;
 }
 
