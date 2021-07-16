@@ -1799,6 +1799,7 @@ bool LX200_OnStep::Park()
     }
     ParkSP.s   = IPS_BUSY;
     TrackState = SCOPE_PARKING; //Azwing fixes TrackState during Parking in Ekos
+    LOG_INFO("Parking telescope in progress...");
     return true;
 }
 
@@ -1857,7 +1858,7 @@ bool LX200_OnStep::ReadScopeStatus()
             }
             if (strstr(OSStat, "I"))
             {
-                TrackState = SCOPE_PARKING;
+                TrackState = SCOPE_PARKING;   // set in LX200_OnStep::Park()
                 IUSaveText(&OnstepStat[1], "Parking");
                 IUSaveText(&OnstepStat[3], "Park in Progress");
             }

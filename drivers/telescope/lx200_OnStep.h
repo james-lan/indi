@@ -26,7 +26,8 @@
     Version not yet updated:
     
     Version 1.11:
-    
+    - Conditional opening of Focuser TAB
+    - Fixed TrackState 
     
     Version 1.10: (finalized: INDI 1.9.1)
     - Weather support for setting temperature/humidity/pressure, values will be overridden in OnStep by any sensor values. 
