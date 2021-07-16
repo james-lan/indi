@@ -1798,6 +1798,7 @@ bool LX200_OnStep::Park()
         }
     }
     ParkSP.s   = IPS_BUSY;
+    TrackState = SCOPE_PARKING; //Azwing fixes TrackState during Parking in Ekos
     return true;
 }
 
