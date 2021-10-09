@@ -194,6 +194,7 @@ char ACK(int fd);
 /*int testTelescope();
 int testAP();*/
 int check_lx200_connection(int fd);
+int check_lx200_connection_fast_timeout(int fd, long timeout_us);
 
 /**************************************************************************
  Get Commands: store data in the supplied buffer. Return 0 on success or -1 on failure

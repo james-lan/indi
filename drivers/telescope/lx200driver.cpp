@@ -173,9 +173,13 @@ int selectCatalogObject(int fd, int catalog, int NNNN);
 /* Select a sub catalog */
 int selectSubCatalog(int fd, int catalog, int subCatalog);
 
-int check_lx200_connection(int in_fd)
+int check_lx200_connection(int in_fd) {
+    return check_lx200_connection_fast_timeout(in_fd, 50000000L);
+}
+
+int check_lx200_connection_fast_timeout(int in_fd, long timeout_us)
 {
-    const struct timespec timeout = {0, 50000000L};
+    struct timespec timeout = {0, 50000000L};
     int i       = 0;
     char ack[1] = { 0x06 };
     char MountAlign[64];
@@ -193,7 +197,8 @@ int check_lx200_connection(int in_fd)
     {
         if (write(in_fd, ack, 1) < 0)
             return -1;
-        tty_read(in_fd, MountAlign, 1, LX200_TIMEOUT, &nbytes_read);
+        tty_read_expanded(in_fd, MountAlign, 1, 0, timeout_us, &nbytes_read);
+//         tty_read(in_fd, MountAlign, 1, LX200_TIMEOUT, &nbytes_read);
         if (nbytes_read == 1)
         {
             DEBUGDEVICE(lx200Name, INDI::Logger::DBG_DEBUG, "Testing successful!");

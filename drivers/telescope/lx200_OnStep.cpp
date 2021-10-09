@@ -1794,6 +1794,41 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
     return LX200Generic::ISNewSwitch(dev, name, states, names, n);
 }
 
+bool LX200_OnStep::Handshake()
+{
+    if (getLX200RA(PortFD, &currentRA) == 0)
+    {
+        LOG_INFO("Handshake: try like TeenAstro is Connected");
+        return true;
+    }
+    else {
+        LOG_ERROR("Handshake: try like TeenAstro failed communicating with telescope.");
+        //return false;
+    }
+
+    //More or less the call from lx200 telescope (shorter timeout)
+    if ( check_lx200_connection_fast_timeout(PortFD, 100000000L) == 0) {
+        LOG_DEBUG("Handshake: Standard connection worked");
+        return true;
+    }
+    
+    //Try this for bluetooth (Standard call retained as it doesn't always seem to work fast)
+    char reply[RB_MAX_LEN]={0};
+    
+    int i = getCommandSingleCharErrorOrLongResponse(PortFD, reply, ":GU#");
+    if (i > 1) {
+        LOG_DEBUG("Handshake: :GU# reply, good!");
+        return true;
+    }
+    else {
+        LOG_DEBUG("Handshake: No reply to :GU#, not connected");
+//         return false;
+    }
+    LOG_DEBUG("Trying normal handshake");
+    return LX200Telescope::Handshake();
+}
+
+
 void LX200_OnStep::getBasicData()
 {
     // process parent
