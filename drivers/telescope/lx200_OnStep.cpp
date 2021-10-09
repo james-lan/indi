@@ -1796,6 +1796,17 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
 
 bool LX200_OnStep::Handshake()
 {
+    char reply1[RB_MAX_LEN]={0};
+    
+    int i = getCommandSingleCharErrorOrLongResponse(PortFD, reply1, ":GU#");
+    if (i > 1) {
+        LOG_INFO("Handshake: :GU# reply, good!");
+        return true;
+    }
+    else {
+        LOG_INFO("Handshake: No reply to :GU#, not connected");
+        //         return false;
+    }
     if (getLX200RA(PortFD, &currentRA) == 0)
     {
         LOG_INFO("Handshake: try like TeenAstro is Connected");
@@ -1808,23 +1819,26 @@ bool LX200_OnStep::Handshake()
 
     //More or less the call from lx200 telescope (shorter timeout)
     if ( check_lx200_connection_fast_timeout(PortFD, 100000000L) == 0) {
-        LOG_DEBUG("Handshake: Standard connection worked");
+        LOG_INFO("Handshake: Standard connection, short timeout worked");
         return true;
-    }
+    } else {
+        LOG_INFO("Handshake: Standard connection, short timeout failed");
+    } 
+    
     
     //Try this for bluetooth (Standard call retained as it doesn't always seem to work fast)
     char reply[RB_MAX_LEN]={0};
     
-    int i = getCommandSingleCharErrorOrLongResponse(PortFD, reply, ":GU#");
+    i = getCommandSingleCharErrorOrLongResponse(PortFD, reply, ":GU#");
     if (i > 1) {
-        LOG_DEBUG("Handshake: :GU# reply, good!");
+        LOG_INFO("Handshake: :GU# reply, good!");
         return true;
     }
     else {
-        LOG_DEBUG("Handshake: No reply to :GU#, not connected");
+        LOG_INFO("Handshake: No reply to :GU#, not connected");
 //         return false;
     }
-    LOG_DEBUG("Trying normal handshake");
+    LOG_INFO("Trying normal handshake");
     return LX200Telescope::Handshake();
 }
 
