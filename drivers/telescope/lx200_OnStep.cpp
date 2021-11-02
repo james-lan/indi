@@ -3100,87 +3100,344 @@ bool LX200_OnStep::sendOnStepCommand(const char *cmd)
 
 int LX200_OnStep::getCommandSingleCharResponse(int fd, char *data, const char *cmd)
 {
-    char *term;
-    int error_type;
-    int nbytes_write = 0, nbytes_read = 0;
+    if (use_checksum_commands) {     char *term;
+        int error_type;
+        int nbytes_write = 0, nbytes_read = 0;
+//        int timeout = 1;
+        char checksummed_command[RB_MAX_LEN] = {0};
+        uint8_t checksum_sent=0;
+        char checksummed_response[RB_MAX_LEN] = {0};
+        char current_sequence[2] = {0};  //Used to compare to make sure the sequence response is right in function.
+        int attempts = 3; //Will try to resend command, if it fails,  
+        strncpy(checksummed_command, cmd, RB_MAX_LEN);
+        
+        char *in_term = strchr(checksummed_command, '#'); //temporarily remove
+        if (in_term)
+            *in_term = '\0';
+        int length = strlen(checksummed_command);
+        for (int i=1; i <= length ; i++)
+        {
+            checksum_sent += checksummed_command[i];
+        }
+        //NOTE: Uncommenting the next line WILL CAUSE CHECKSUMS TO FAIL FOR TESTING
+        //         checksum_sent += 1;
+        if (length > RB_MAX_LEN-5) {
+            LOG_ERROR("Command passed to getCommandSingleCharErrorOrLongResponse to long for buffer, which should be way longer than any command");
+            return -200; //Shouldn't ever get triggered, but we don't want overflows!)
+        }
+        char* current_end = checksummed_command + sizeof(char) * length;
+        char checksum_sent_str[3] = {0};
+        sprintf(current_end,"%02X",checksum_sent);
+        sprintf(checksum_sent_str,"%02X",checksum_sent);
+        current_end += 2; //advance to the \0
+        sprintf(current_end, "%01X", checksum_sequence);
+        sprintf(current_sequence, "%01X", checksum_sequence);
+        checksum_sequence++;
+        if (checksum_sequence > 9) checksum_sequence = 0;
+        current_end += 1; //advance to the \0
+        strncpy(current_end, "#", 2);
+        checksummed_command[0]=';';
 
-    DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
+        /* Add mutex */
+        std::unique_lock<std::mutex> guard(lx200CommsLock);
+        
+        while (attempts > 0) {
+            attempts--;
+            LOGF_DEBUG("Command: %s checksummed to %s, calculated_checksum %s, sequence %s, checksum_sent: %u, attempt: %u", cmd, checksummed_command, checksum_sent_str, current_sequence, checksum_sent, attempts);
+            
+            if ((error_type = tty_write_string(fd, checksummed_command, &nbytes_write)) != TTY_OK)
+                return error_type;
+            
+            
+            //error_type = tty_read_section(fd, checksummed_response, '#', timeout, &nbytes_read);
+            error_type = tty_read_section_expanded(fd, checksummed_response, '#', ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
+          //  return tty_read_section_expanded(fd, buf, stop_char, (long) timeout, (long) 0, nbytes_read);
+            
+            //error_type = tty_read_expanded(fd, data, 1, ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
+            tcflush(fd, TCIFLUSH);
+            
+            DEBUGF(DBG_SCOPE, "RAW RES <%s>", checksummed_response);
+            //TODO: Replace data with checksummed_response
+            term = strchr(checksummed_response, '#');
+            if (term)
+                *term = '\0';
+            if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
+                checksummed_response[nbytes_read] = '\0';
+            
+            if(use_checksum_commands)
+            {
+                //Check and strip checksum from response
+                if (strncmp("CK_FAIL", checksummed_response, 7) == 0) {
+                    if (attempts > 0) {
+                        LOG_WARN("Possibly Correctable Checksum failure (Not an error yet, will retry)");
+                    } else {
+                        LOG_ERROR("Uncorrectable (or reached max retries) Checksum failure");
+                    }
+                    //Recalculate checksum and resend
+                    strncpy(checksummed_command, cmd, RB_MAX_LEN);
+                    
+                    in_term = strchr(checksummed_command, '#'); //temporarily remove
+                    if (in_term)
+                        *in_term = '\0';
+                    int length = strlen(checksummed_command);
+                    checksum_sent = 0;
+                    for (int i=1; i <= length ; i++)
+                    {
+                        checksum_sent += checksummed_command[i];
+                    }
+                    current_end = checksummed_command + sizeof(char) * length;
+                    char checksum_sent_str[3] = {0};
+                    sprintf(current_end,"%02X",checksum_sent);
+                    sprintf(checksum_sent_str,"%02X",checksum_sent);
+                    current_end += 2; //advance to the \0
+//                     checksum_sequence++;
+//                     if (checksum_sequence > 9) checksum_sequence = 0;
+                    sprintf(current_end, "%01X", checksum_sequence);
+                    sprintf(current_sequence, "%01X", checksum_sequence);
+                    current_end += 1; //advance to the \0
+                    strncpy(current_end, "#", 2);
+                    checksummed_command[0]=';';
+                    LOGF_DEBUG("Command: %s checksummed to %s, calculated_checksum %s, sequence %s, checksum_sent: %u, attempt: %u", cmd, checksummed_command, checksum_sent_str, current_sequence, checksum_sent, attempts);
+                    
+                    //Current, if it's enabled, set 
+                    if (attempts > 0) {
+                        LOGF_WARN("Command: %s, Response: %s, attempts left: %u", checksummed_command, checksummed_response, attempts);
+                    }
+                    memset(checksummed_response,0,RB_MAX_LEN); //Clear the buffer
+                    tcflush(fd, TCIFLUSH);
+                    if (attempts == 0) {
+                        LOG_ERROR("Got an unhandled checksum failure back");
+                        return -201; //Checksum failed, retransmit;
+                    }
+                } else {
+                    int length = strlen(checksummed_response);
+                    
+                    uint8_t calculated_checksum = 0;
+                    for (int i = 0; i < length - 3; i++) {
+                        calculated_checksum += checksummed_response[i];
+                    }
+                    char calculated_checksum_str[3] = {0};
+                    sprintf(calculated_checksum_str, "%02X", calculated_checksum);
+                    //         if (strcmp(calculated_checksum_str, checksummed_response))
+                    if (calculated_checksum_str[0] == checksummed_response[length-3] && calculated_checksum_str[1] == checksummed_response[length-2] && checksummed_response [length-1] == current_sequence[0] )
+                    {
+                        checksummed_response[length-3] = '\0';
+                        strncpy(data, checksummed_response, length-2);
+                    } else {
+                        LOGF_WARN("Got bad checksum response: Reply {%s} (# stripped) checksum {%s}, sequence {%s}", checksummed_response, calculated_checksum_str, current_sequence);
+                        if (attempts == 0) {
+                            LOGF_ERROR("ERROR on checksums response on command: %s, Check connection & logs", checksummed_command);
+                            return -202;
+                        }
+                    }
+                }
+            } else {
+                strncpy(data, checksummed_response, RB_MAX_LEN);
+            }
+        }
+        
+        DEBUGF(DBG_SCOPE, "RES <%s>", data);
+        
+        if (error_type != TTY_OK) {
+            LOGF_DEBUG("Error %d", error_type);
+            return error_type;
+        }
+        return 0;
+        
+    } else {
+        char *term;
+        int error_type;
+        int nbytes_write = 0, nbytes_read = 0;
 
-    /* Add mutex */
-    std::unique_lock<std::mutex> guard(lx200CommsLock);
+        DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
 
-    if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
-        return error_type;
+        /* Add mutex */
+        std::unique_lock<std::mutex> guard(lx200CommsLock);
 
-    //     error_type = tty_read(fd, data, 1, timeout, &nbytes_read);
-    error_type = tty_read_expanded(fd, data, 1, ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
-    tcflush(fd, TCIFLUSH);
+        if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
+            return error_type;
 
-    if (error_type != TTY_OK)
-        return error_type;
+        //     error_type = tty_read(fd, data, 1, timeout, &nbytes_read);
+        error_type = tty_read_expanded(fd, data, 1, ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
+        tcflush(fd, TCIFLUSH);
 
-    term = strchr(data, '#');
-    if (term)
-        *term = '\0';
-    if (nbytes_read < RB_MAX_LEN) //given this function that should always be true, as should nbytes_read always be 1
-    {
-        data[nbytes_read] = '\0';
+        if (error_type != TTY_OK)
+            return error_type;
+
+        term = strchr(data, '#');
+        if (term)
+            *term = '\0';
+        if (nbytes_read < RB_MAX_LEN) //given this function that should always be true, as should nbytes_read always be 1
+        {
+            data[nbytes_read] = '\0';
+        }
+        else
+        {
+            LOG_DEBUG("got RB_MAX_LEN bytes back (which should never happen), last byte set to null and possible overflow");
+            data[RB_MAX_LEN - 1] = '\0';
+        }
+
+        DEBUGF(DBG_SCOPE, "RES <%s>", data);
+
+        return 0;
     }
-    else
-    {
-        LOG_DEBUG("got RB_MAX_LEN bytes back (which should never happen), last byte set to null and possible overflow");
-        data[RB_MAX_LEN - 1] = '\0';
-    }
 
-    DEBUGF(DBG_SCOPE, "RES <%s>", data);
-
-    return 0;
 }
 
 int LX200_OnStep::getCommandSingleCharErrorOrLongResponse(int fd, char *data, const char *cmd)
 {
-    char *term;
-    int error_type;
-    int nbytes_write = 0, nbytes_read = 0;
-
-
-    DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
-
-    /* Add mutex */
-    std::unique_lock<std::mutex> guard(lx200CommsLock);
-
-    if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
-        return error_type;
-
-    //     error_type = tty_read_section(fd, data, '#', timeout, &nbytes_read);
-    error_type = tty_read_section_expanded(fd, data, '#', ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
-    tcflush(fd, TCIFLUSH);
-
-
-
-    term = strchr(data, '#');
-    if (term)
-        *term = '\0';
-    if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
+    if (use_checksum_commands)
     {
-        data[nbytes_read] = '\0'; //Indexed at 0, so this is the byte passed it
-    }
-    else
-    {
-        LOG_DEBUG("got RB_MAX_LEN bytes back, last byte set to null and possible overflow");
-        data[RB_MAX_LEN - 1] = '\0';
-    }
+        char *term;
+        int error_type;
+        int nbytes_write = 0, nbytes_read = 0;
+        int timeout = 1;
+        char checksummed_command[RB_MAX_LEN] = {0};
+        uint8_t checksum_sent=0;
+        char checksummed_response[RB_MAX_LEN] = {0};
+        char current_sequence[2] = {0};  //Used to compare to make sure the sequence response is right in function.
+        int attempts = 1; //Will try to resend command, if it fails,  
+        strncpy(checksummed_command, cmd, RB_MAX_LEN);
+        
+        char *in_term = strchr(checksummed_command, '#'); //temporarily remove
+        if (in_term)
+            *in_term = '\0';
+        int length = strlen(checksummed_command);
+        for (int i=1; i <= length ; i++)
+        {
+            checksum_sent += checksummed_command[i];
+        }
+        //NOTE: Uncommenting the next line WILL CAUSE CHECKSUMS TO FAIL FOR TESTING
+        //         checksum_sent += 1;
+        if (length > RB_MAX_LEN-5) {
+            LOG_ERROR("Command passed to getCommandSingleCharErrorOrLongResponse to long for buffer, which should be way longer than any command");
+            return -200; //Shouldn't ever get triggered, but we don't want overflows!)
+        }
+        char* current_end = checksummed_command + sizeof(char) * length;
+        char checksum_sent_str[3] = {0};
+        sprintf(current_end,"%02X",checksum_sent);
+        sprintf(checksum_sent_str,"%02X",checksum_sent);
+        current_end += 2; //advance to the \0
+        sprintf(current_end, "%01X", checksum_sequence);
+        sprintf(current_sequence, "%01X", checksum_sequence);
+        checksum_sequence++;
+        if (checksum_sequence > 9) checksum_sequence = 0;
+        current_end += 1; //advance to the \0
+        strncpy(current_end, "#", 2);
+        checksummed_command[0]=';';
+        LOGF_DEBUG("Command: %s checksummed to %s, calculated_checksum %s, sequence %s", cmd, checksummed_command, checksum_sent_str, current_sequence);
+        
+        
+        /* Add mutex */
+        std::unique_lock<std::mutex> guard(lx200CommsLock);
+        
+        while (attempts > 0) {
+            attempts--;
+            if ((error_type = tty_write_string(fd, checksummed_command, &nbytes_write)) != TTY_OK)
+                return error_type;
+            
+            error_type = tty_read_section(fd, checksummed_response, '#', timeout, &nbytes_read);
+            tcflush(fd, TCIFLUSH);
+            
+            DEBUGF(DBG_SCOPE, "RES <%s>", checksummed_response);
+            //TODO: Replace data with checksummed_response
+            term = strchr(checksummed_response, '#');
+            if (term)
+                *term = '\0';
+            if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
+                checksummed_response[nbytes_read] = '\0';
+            
+            if(use_checksum_commands)
+            {
+                //Check and strip checksum from response
+                if (!strncmp("CK_FAILS", checksummed_response, 8)) {
+                    //TODO: Handle retransmission
+                    //Current, if it's enabled, set 
+                    LOGF_WARN("Command: %s, Response: %s", checksummed_command, checksummed_response);
+                    if (attempts == 0) {
+                        LOG_ERROR("Got an unhandled checksum failure back");
+                        return -201; //Checksum failed, retransmit;
+                    }
+                } else {
+                    int length = strlen(checksummed_response);
+                    
+                    uint8_t calculated_checksum = 0;
+                    for (int i = 0; i < length - 3; i++) {
+                        calculated_checksum += checksummed_response[i];
+                    }
+                    char calculated_checksum_str[3] = {0};
+                    sprintf(calculated_checksum_str, "%02X", calculated_checksum);
+                    //         if (strcmp(calculated_checksum_str, checksummed_response))
+                    if (calculated_checksum_str[0] == checksummed_response[length-3] && calculated_checksum_str[1] == checksummed_response[length-2] && checksummed_response [length-1] == current_sequence[0] )
+                    {
+                        checksummed_response[length-3] = '\0';
+                        strncpy(data, checksummed_response, length-2);
+                    } else {
+                        LOGF_WARN("Got bad checksum response: Reply {%s} (# stripped) checksum {%s}, sequence {%s}", checksummed_response, calculated_checksum_str, current_sequence);
+                        if (attempts == 0) {
+                            LOGF_ERROR("ERROR on checksums response on command: %s, Check connection & logs", checksummed_command);
+                            return -202;
+                        }
+                    }
+                }
+            } else {
+                strncpy(data, checksummed_response, RB_MAX_LEN);
+            }
+        }
+        
+        DEBUGF(DBG_SCOPE, "RES <%s>", data);
+        
+        if (error_type != TTY_OK) {
+            LOGF_DEBUG("Error %d", error_type);
+            return error_type;
+        }
+        return nbytes_read;
+        
+        
+    } else { // NON Checksummed commands
+        char *term;
+        int error_type;
+        int nbytes_write = 0, nbytes_read = 0;
 
-    DEBUGF(DBG_SCOPE, "RES <%s>", data);
 
-    if (error_type != TTY_OK)
-    {
-        LOGF_DEBUG("Error %d", error_type);
-        return error_type;
+        DEBUGF(DBG_SCOPE, "CMD <%s>", cmd);
+
+        /* Add mutex */
+        std::unique_lock<std::mutex> guard(lx200CommsLock);
+
+        if ((error_type = tty_write_string(fd, cmd, &nbytes_write)) != TTY_OK)
+            return error_type;
+
+        //     error_type = tty_read_section(fd, data, '#', timeout, &nbytes_read);
+        error_type = tty_read_section_expanded(fd, data, '#', ONSTEP_TIMEOUT_SECONDS, ONSTEP_TIMEOUT_MICROSECONDS, &nbytes_read);
+        tcflush(fd, TCIFLUSH);
+
+
+
+        term = strchr(data, '#');
+        if (term)
+            *term = '\0';
+        if (nbytes_read < RB_MAX_LEN) //If within buffer, terminate string with \0 (in case it didn't find the #)
+        {
+            data[nbytes_read] = '\0'; //Indexed at 0, so this is the byte passed it
+        }
+        else
+        {
+            LOG_DEBUG("got RB_MAX_LEN bytes back, last byte set to null and possible overflow");
+            data[RB_MAX_LEN - 1] = '\0';
+        }
+
+        DEBUGF(DBG_SCOPE, "RES <%s>", data);
+
+        if (error_type != TTY_OK)
+        {
+            LOGF_DEBUG("Error %d", error_type);
+            return error_type;
+        }
+        return nbytes_read;
+
+        //return 0;
     }
-    return nbytes_read;
-
-    //return 0;
 }
 
 
