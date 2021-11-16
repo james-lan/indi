@@ -52,6 +52,24 @@ void MathPluginManagement::InitProperties(Telescope *ChildTelescope)
         AlignmentSubsystemMathPluginsV.sp[configPlugin].s = ISS_ON;
         HandlePluginLoading(ChildTelescope, 0, configPlugin);
     }
+    // Select nearest if available
+    else
+    {
+        ISwitch *sp = IUFindSwitch(&AlignmentSubsystemMathPluginsV, "Nearest Math Plugin");
+        if (sp)
+        {
+            IUResetSwitch(&AlignmentSubsystemMathPluginsV);
+            for (int i = 0; i < AlignmentSubsystemMathPluginsV.nsp; i++)
+            {
+                if (!strcmp(AlignmentSubsystemMathPluginsV.sp[i].name, sp->name))
+                {
+                    sp->s = ISS_ON;
+                    HandlePluginLoading(ChildTelescope, 0, i);
+                    break;
+                }
+            }
+        }
+    }
     ChildTelescope->registerProperty(&AlignmentSubsystemMathPluginsV, INDI_SWITCH);
 
     IUFillSwitch(&AlignmentSubsystemMathPluginInitialise, "ALIGNMENT_SUBSYSTEM_MATH_PLUGIN_INITIALISE", "OK", ISS_OFF);
@@ -323,8 +341,9 @@ void MathPluginManagement::SetApproximateMountAlignmentFromMountType(MountType_t
             else
                 SetApproximateMountAlignment(SOUTH_CELESTIAL_POLE);
         }
-        //else
-        // TODO some kind of error!!!
+        // If no position found, assume northern hemisphere.
+        else
+            SetApproximateMountAlignment(NORTH_CELESTIAL_POLE);
     }
     else
         SetApproximateMountAlignment(ZENITH);

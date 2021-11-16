@@ -485,19 +485,19 @@
             <driver name="V4L2 CCD">indi_v4l2_ccd</driver>
             <version>1.0</version>
         </device>
-        <device label="Skyris 132C" manufacturer="Skyris">
+        <device label="Skyris 132C" manufacturer="Celestron">
             <driver name="V4L2 CCD">indi_v4l2_ccd</driver>
             <version>1.0</version>
         </device>
-        <device label="Skyris 132M" manufacturer="Skyris">
+        <device label="Skyris 132M" manufacturer="Celestron">
             <driver name="V4L2 CCD">indi_v4l2_ccd</driver>
             <version>1.0</version>
         </device>
-        <device label="Skyris 236C" manufacturer="Skyris">
+        <device label="Skyris 236C" manufacturer="Celestron">
             <driver name="V4L2 CCD">indi_v4l2_ccd</driver>
             <version>1.0</version>
         </device>
-        <device label="Skyris 236M" manufacturer="Skyris">
+        <device label="Skyris 236M" manufacturer="Celestron">
             <driver name="V4L2 CCD">indi_v4l2_ccd</driver>
             <version>1.0</version>
         </device>
@@ -701,7 +701,7 @@
         </device>
         <device label="OpenWeatherMap" manufacturer="Others">
             <driver name="OpenWeatherMap">indi_openweathermap_weather</driver>
-            <version>1.0</version>
+            <version>1.1</version>
         </device>
         <device label="MBox" manufacturer="Astromi">
             <driver name="MBox">indi_mbox_weather</driver>
