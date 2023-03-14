@@ -269,6 +269,7 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         int  setMinElevationLimit(int fd, int min);
         int OSUpdateFocuser(); //Return = 0 good, -1 = Communication error
         int OSUpdateRotator(); //Return = 0 good, -1 = Communication error
+        int OSUpdateFocuserCompensation(); //Return = 0 good
 
         ITextVectorProperty ObjectInfoTP;
         IText ObjectInfoT[1] {};
@@ -324,6 +325,7 @@ class LX200_OnStep : public LX200Generic, public INDI::WeatherInterface, public 
         INumber TFCCoefficientN[1];
         INumberVectorProperty TFCDeadbandNP;
         INumber TFCDeadbandN[1];
+        bool OSTFCHasCompensation = true; //False if no compensation response
         // End Focus T° Compensation
 
         int OSNumFocusers = 0;

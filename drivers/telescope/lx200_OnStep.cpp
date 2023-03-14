@@ -503,10 +503,19 @@ bool LX200_OnStep::updateProperties()
             OSFocuser1 = true;
             defineProperty(&OSFocus1InitializeSP);
             // Focus T° Compensation
-            defineProperty(&FocuserTNP);
-            defineProperty(&TFCCompensationSP);
-            defineProperty(&TFCCoefficientNP);
-            defineProperty(&TFCDeadbandNP);
+            char response2[RB_MAX_LEN] = {0};
+            int error_or_fail2 = getCommandSingleCharResponse(PortFD, response, ":Fc#");
+            if (error_or_fail2 == 1 && (response2[0] == '0' || response2[0]== '1')) {
+                OSTFCHasCompensation = true;
+                defineProperty(&FocuserTNP);
+                defineProperty(&TFCCompensationSP);
+                defineProperty(&TFCCoefficientNP);
+                defineProperty(&TFCDeadbandNP);
+            }
+            else
+            {
+                OSTFCHasCompensation = false;
+            }
             // End Focus T° Compensation
             OSNumFocusers = 1;
         }
@@ -1889,31 +1898,49 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
         // Focus T° Compensation
         if (!strcmp(name, TFCCompensationSP.name))
         {
-        // :Fc[n]#    Enable/disable focuser temperature compensation where [n] = 0 or 1
-        //            Return: 0 on failure
-        //                    1 on success
-        char cmd[CMD_MAX_LEN] = {0};
-        int ret = 0;
+            // :Fc[n]#    Enable/disable focuser temperature compensation where [n] = 0 or 1
+            //            Return: 0 on failure
+            //                    1 on success
+            char response[RB_MAX_LEN] = {0};
             IUUpdateSwitch(&TFCCompensationSP, states, names, n);
             TFCCompensationSP.s = IPS_OK;
 
             if (TFCCompensationS[0].s == ISS_ON)
             {
-                snprintf(cmd, sizeof(cmd), ":Fc0#");
-                ret = sendOnStepCommandBlind(cmd);
-                //TFCCompensationS[0].s = ISS_OFF;
-                IDSetSwitch(&TFCCompensationSP, "Idle");
+                int error_or_fail = getCommandSingleCharResponse(PortFD, response, ":Fc0#");
+                if (response[0] == '1' && error_or_fail==1)  //Success
+                {
+                    TFCCompensationSP.s = IPS_OK;
+                    IDSetSwitch(&TFCCompensationSP, "Active");
+                } else if (response[0] == '0' && error_or_fail==1 ) {
+                    TFCCompensationSP.s = IPS_ALERT;
+                    IDSetSwitch(&TFCCompensationSP, "UNKNOWN");
+                    IUResetSwitch(&TFCCompensationSP);
+                } else {
+                    TFCCompensationSP.s = IPS_ALERT;
+                    LOG_ERROR("Response received outside expected responses of 0/1, possibly new/unsupported OnStep version or communication error.");
+                    IDSetSwitch(&TFCCompensationSP, "UNKNOWN");
+                    IUResetSwitch(&TFCCompensationSP);
+                }
             }
             else
             {
-                snprintf(cmd, sizeof(cmd), ":Fc1#");
-                ret = sendOnStepCommandBlind(cmd);
-                //TFCCompensationS[1].s = ISS_OFF;
-                IDSetSwitch(&TFCCompensationSP, "Idle");
+                int error_or_fail = getCommandSingleCharResponse(PortFD, response, ":Fc1#");
+                if (response[0] == '1' && error_or_fail==1) //Success 
+                {
+                    TFCCompensationSP.s = IPS_OK;
+                    IDSetSwitch(&TFCCompensationSP, "Idle");
+                } else if (response[0] == '0' && error_or_fail==1 ) {
+                    TFCCompensationSP.s = IPS_ALERT;
+                    IDSetSwitch(&TFCCompensationSP, "UNKNOWN");
+                    IUResetSwitch(&TFCCompensationSP);
+                } else {
+                    TFCCompensationSP.s = IPS_ALERT;
+                    LOG_ERROR("Response received outside expected responses of 0/1, possibly new/unsupported OnStep version or communication error.");
+                    IDSetSwitch(&TFCCompensationSP, "UNKNOWN");
+                    IUResetSwitch(&TFCCompensationSP);
+                }
             }
-
-            INDI_UNUSED(ret);
-            IUResetSwitch(&TFCCompensationSP);
             IDSetSwitch(&TFCCompensationSP, nullptr);
             return true;
         }
@@ -1989,12 +2016,16 @@ void LX200_OnStep::getBasicData()
             LOG_INFO("Old OnStep (V1/V2 depreciated) detected, setting some defaults");
             LOG_INFO("Note: Everything should work, but it may have timeouts in places, as it's not tested against.");
             OSHighPrecision = false;
+            OSTFCHasCompensation = false;
             OnStepMountVersion = OSV_OnStepV1or2;
         }
         else if (VersionT[2].text[0] == '3' && (strcmp(VersionT[3].text, "OnStep") || strcmp(VersionT[3].text, "On-Step")))
         {
             LOG_INFO("V3 OnStep detected, setting some defaults");
             OSHighPrecision = false;
+            if (VersionT[2].text[2] < '6') { //(Introduced in 3.6, Oct 19, 2019)
+                OSTFCHasCompensation = false;
+            }
             OnStepMountVersion = OSV_OnStepV3;
         }
         else if (VersionT[2].text[0] == '4' && (strcmp(VersionT[3].text, "OnStep") || strcmp(VersionT[3].text, "On-Step")))
@@ -3884,104 +3915,13 @@ int LX200_OnStep::OSUpdateFocuser()
             LOG_WARN("Communication :FI# error, check connection.");
             flushIO(PortFD); //Unlikely to do anything, but just in case.
         }
-        
-        // Focus T° Compensation
-        //  :Ft#    Get Focuser Temperature
-        //          Returns: n#
-        char focus_T[RB_MAX_LEN] = {0};
-        int focus_T_int ;
-        int ft_error = getCommandIntResponse(PortFD, &focus_T_int, focus_T, ":Ft#");
-        if (ft_error > 0)
-        {
-            FocuserTN[0].value =  atof(focus_T);
-            IDSetNumber(&FocuserTNP, nullptr);
-            LOGF_DEBUG("focus T°: %s, %i fi_error: %i", focus_T, focus_T_int, ft_error);
-        }
-        else
-        {
-            LOG_WARN("Communication :Ft# error, check connection.");
-            flushIO(PortFD); //Unlikely to do anything, but just in case.
-        }
-
-        //  :Fe#    Get Focus Differential T°
-        //          Returns: n#
-        char focus_TD[RB_MAX_LEN] = {0};
-        int focus_TD_int ;
-        int fe_error = getCommandIntResponse(PortFD, &focus_TD_int, focus_TD, ":Fe#");
-        if (fe_error > 0)
-        {
-            FocuserTN[1].value =  atof(focus_TD);
-            IDSetNumber(&FocuserTNP, nullptr);
-            LOGF_DEBUG("focus Differential T°: %s, %i fi_error: %i", focus_TD, focus_TD_int, fe_error);
-        }
-        else
-        {
-            LOG_WARN("Communication :Fe# error, check connection.");
-            flushIO(PortFD); //Unlikely to do anything, but just in case.
-        }
-        
-        // :FC#       Get focuser temperature compensation coefficient in microns per °C)
-        //            Return: n.n#
-        char focus_Coeficient[RB_MAX_LEN] = {0};
-        int focus_Coefficient_int ;
-        int fC_error = getCommandIntResponse(PortFD, &focus_Coefficient_int, focus_Coeficient, ":FC#");
-        if (fC_error > 0)
-        {
-            TFCCoefficientN[0].value =  atof(focus_Coeficient);
-            IDSetNumber(&TFCCoefficientNP, nullptr);
-            LOGF_DEBUG("TFC Coefficient: %s, %i fC_error: %i", focus_Coeficient, focus_Coefficient_int, fC_error);
-        }
-        else
-        {
-            LOG_WARN("Communication :FC# error, check connection.");
-            flushIO(PortFD); //Unlikely to do anything, but just in case.
-        }
-        
-        // :FD#       Get focuser temperature compensation deadband amount (in steps or microns)
-        //            Return: n#
-        char focus_Deadband[RB_MAX_LEN] = {0};
-        int focus_Deadband_int ;
-        int fD_error = getCommandIntResponse(PortFD, &focus_Deadband_int, focus_Deadband, ":FD#");
-        if (fD_error > 0)
-        {
-            TFCDeadbandN[0].value =  focus_Deadband_int;
-            IDSetNumber(&TFCDeadbandNP, nullptr);
-            LOGF_DEBUG("TFC Deadband: %s, %i fD_error: %i", focus_Deadband, focus_Deadband_int, fD_error);
-        }
-        else
-        {
-            LOG_WARN("Communication :FD# error, check connection.");
-            flushIO(PortFD); //Unlikely to do anything, but just in case.
-        }
-        
-        // :FC#       Get focuser temperature compensation coefficient in microns per °C)
-        //            Return: n.n#
-        char response[RB_MAX_LEN];
-        int res = getCommandSingleCharResponse(PortFD, response, ":Fc#");
-        if (res > 0)
-        {
-            if (strcmp(response,"0"))
+        if (OSTFCHasCompensation == true) {
+            int compensation_status = OSUpdateFocuserCompensation();
+            if (compensation_status != 0)
             {
-                TFCCompensationSP.s = IPS_OK;
-                TFCCompensationS[0].s = ISS_OFF;
-                TFCCompensationS[1].s = ISS_ON;
+                LOGF_ERROR("Temperature Compensation returned status: %i", compensation_status);
             }
-            else if (strcmp(response,"1"))
-            {
-                TFCCompensationSP.s = IPS_OK;
-                TFCCompensationS[0].s = ISS_ON;
-                TFCCompensationS[1].s = ISS_OFF;
-            }
-            IDSetSwitch(&TFCCompensationSP, nullptr);
-            LOGF_DEBUG("TFC Enable: fc_error:%d Fc_response: %s", res, response);
         }
-        else
-        {
-            //LOGF_DEBUG("TFC Enable1: fc_error:%i Fc_response: %s", res, response);
-            LOG_WARN("Communication :Fc# error, check connection.");
-            flushIO(PortFD); //Unlikely to do anything, but just in case.
-        }
-        // End Focus T° Compensation
 
         FI::updateProperties();
         LOGF_DEBUG("After update properties: FocusAbsPosN min: %f max: %f", FocusAbsPosN[0].min, FocusAbsPosN[0].max);
@@ -4054,6 +3994,117 @@ int LX200_OnStep::OSUpdateFocuser()
     return 0;
 }
 
+// Focus T° Compensation
+
+int LX200_OnStep::OSUpdateFocuserCompensation() {
+    int errors = 0;
+    if (OSTFCHasCompensation == true) {
+        //  :Ft#    Get Focuser Temperature
+        //          Returns: n#
+        char focus_T[RB_MAX_LEN] = {0};
+        double focus_T_float ;
+        int ft_error = getCommandDoubleResponse(PortFD, &focus_T_float, focus_T, ":Ft#");
+        if (ft_error > 0)
+        {
+            FocuserTN[0].value =  focus_T_float;
+            IDSetNumber(&FocuserTNP, nullptr);
+            LOGF_DEBUG("focus T°: %s, %f fi_error(Bytes Read): %i", focus_T, focus_T_float, ft_error);
+        }
+        else
+        {
+            LOG_WARN("Communication :Ft# error, check connection.");
+            flushIO(PortFD); //Unlikely to do anything, but just in case.
+            errors += 1;
+        } 
+
+        //  :Fe#    Get Focus Differential T°
+        //          Returns: n#
+        char focus_TD[RB_MAX_LEN] = {0};
+        double focus_TD_float;
+        int fe_error = getCommandDoubleResponse(PortFD, &focus_TD_float, focus_TD, ":Fe#");
+        if (fe_error > 0)
+        {
+            FocuserTN[1].value =  focus_TD_float;
+            IDSetNumber(&FocuserTNP, nullptr);
+            LOGF_DEBUG("focus Differential T°: %s, %f fi_error(Bytes Read): %i", focus_TD, focus_TD_float, fe_error);
+        }
+        else
+        {
+            LOG_WARN("Communication :Fe# error, check connection.");
+            flushIO(PortFD); //Unlikely to do anything, but just in case.
+            errors += 1;
+        }
+
+        // :FC#       Get focuser temperature compensation coefficient in microns per °C)
+        //            Return: n.n#
+        char focus_Coeficient_resp[RB_MAX_LEN] = {0};
+        double focus_Coefficient_double ;
+        int fC_error = getCommandDoubleResponse(PortFD, &focus_Coefficient_double, focus_Coeficient_resp, ":FC#");
+        if (fC_error > 0)
+        {
+            TFCCoefficientN[0].value =  focus_Coefficient_double;
+            IDSetNumber(&TFCCoefficientNP, nullptr);
+            LOGF_DEBUG("TFC Coefficient: %s, %f fC_error(Bytes Read): %i", focus_Coeficient_resp, focus_Coefficient_double, fC_error);
+        }
+        else
+        {
+            LOG_WARN("Communication :FC# error, check connection.");
+            LOGF_DEBUG("TFC Coefficient response: %s, fC_error: %i", focus_Coeficient_resp, fC_error);
+            flushIO(PortFD); //Unlikely to do anything, but just in case.
+            errors += 1;
+        }
+
+        // :FD#       Get focuser temperature compensation deadband amount (in steps or microns)
+        //            Return: n#
+        char focus_Deadband[RB_MAX_LEN] = {0};
+        double focus_Deadband_double ;
+        int fD_error = getCommandDoubleResponse(PortFD, &focus_Deadband_double, focus_Deadband, ":FD#");
+        if (fD_error > 0)
+        {
+            TFCDeadbandN[0].value =  focus_Deadband_double;
+            IDSetNumber(&TFCDeadbandNP, nullptr);
+            LOGF_DEBUG("TFC Deadband: %s, %f fD_error(Bytes Read): %i", focus_Deadband, focus_Deadband_double, fD_error);
+        }
+        else
+        {
+            LOG_WARN("Communication :FD# error, check connection.");
+            flushIO(PortFD); //Unlikely to do anything, but just in case.
+            errors += 1;
+        }
+
+        // :Fc#       Get focuser temperature compensation enable status
+        //            Return: 0 if disabled
+        //                    1 if enabled
+        char response[RB_MAX_LEN];
+        int res = getCommandSingleCharResponse(PortFD, response, ":Fc#");
+        if (res == 1)
+        {
+            if (strcmp(response,"0"))
+            {
+                TFCCompensationSP.s = IPS_OK;
+                TFCCompensationS[0].s = ISS_OFF;
+                TFCCompensationS[1].s = ISS_ON;
+            }
+            else if (strcmp(response,"1"))
+            {
+                TFCCompensationSP.s = IPS_OK;
+                TFCCompensationS[0].s = ISS_ON;
+                TFCCompensationS[1].s = ISS_OFF;
+            }
+            IDSetSwitch(&TFCCompensationSP, nullptr);
+            LOGF_DEBUG("TFC Enabled: fc_error:%d Fc_response: %s", res, response);
+        }
+        else
+        {
+            //LOGF_DEBUG("TFC Enable1: fc_error:%i Fc_response: %s", res, response);
+            LOG_WARN("Communication :Fc# error, check connection.");
+            flushIO(PortFD); //Unlikely to do anything, but just in case.
+            errors += 1;
+        }
+        // End Focus T° Compensation
+    }
+    return errors;
+}
 
 //Rotator stuff
 // IPState MoveRotator(double angle) override;
